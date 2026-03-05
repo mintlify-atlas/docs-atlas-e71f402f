@@ -1,0 +1,122 @@
+{
+  "projectType": "saas",
+  "projectName": "Health Manager",
+  "projectDescription": "A self-hosted health management platform for tracking medical appointments, weight measurements, heart rate, blood pressure, and exercise activities with secure data sharing capabilities.",
+  "theme": "mint",
+  "primaryColor": "#94cb04",
+  "lightColor": "#545454",
+  "darkColor": null,
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "configuration"
+            ]
+          },
+          {
+            "group": "Core Features",
+            "pages": [
+              "features/calendar",
+              "features/health-tracking",
+              "features/appointments",
+              "features/data-sharing"
+            ]
+          },
+          {
+            "group": "Deployment",
+            "pages": [
+              "deployment/vps-setup",
+              "deployment/shared-hosting",
+              "deployment/docker"
+            ]
+          },
+          {
+            "group": "User Guide",
+            "pages": [
+              "guides/first-login",
+              "guides/managing-records",
+              "guides/sharing-data",
+              "guides/exporting-data"
+            ]
+          },
+          {
+            "group": "Administration",
+            "pages": [
+              "admin/user-management",
+              "admin/permissions",
+              "admin/security"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Models",
+            "pages": [
+              "api/models/user",
+              "api/models/medical-appointment",
+              "api/models/measurement-weight",
+              "api/models/measurement-heart",
+              "api/models/activity-exercise"
+            ]
+          },
+          {
+            "group": "Components",
+            "pages": [
+              "api/livewire/calendar",
+              "api/livewire/health-tracking",
+              "api/livewire/data-sharing"
+            ]
+          },
+          {
+            "group": "Controllers",
+            "pages": [
+              "api/controllers/export",
+              "api/controllers/attachment",
+              "api/controllers/file"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Interactive calendar for medical appointments and health events",
+    "Weight tracking with historical graphs and trends",
+    "Blood pressure and heart rate monitoring",
+    "Exercise activity logging",
+    "Medical history and document storage",
+    "Secure data sharing with read-only access",
+    "PDF export of health records",
+    "Multi-user support with role-based permissions",
+    "First-user-admin auto-installation",
+    "Docker support for containerized deployment"
+  ],
+  "publicApiSurface": [
+    "User Model (authentication, roles, permissions, data sharing)",
+    "MedicalAppointment Model (appointments tracking)",
+    "MeasurementWeight Model (weight measurements)",
+    "MeasurementHeart Model (heart rate and blood pressure)",
+    "ActivityExercise Model (exercise tracking)",
+    "Calendar Livewire Component (dashboard calendar view)",
+    "WeightLog Livewire Component (weight entry form)",
+    "HeartLog Livewire Component (blood pressure entry form)",
+    "AppointmentLog Livewire Component (appointment entry form)",
+    "ActivityLog Livewire Component (exercise entry form)",
+    "ShareData Livewire Component (data sharing management)",
+    "HealthHistory Livewire Component (historical records view)",
+    "HealthStats Livewire Component (statistics and graphs)",
+    "UserManagement Livewire Component (admin panel)",
+    "ExportController (PDF export functionality)",
+    "AttachmentController (file viewing)",
+    "FileController (file handling)"
+  ]
+}
