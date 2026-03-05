@@ -1,0 +1,179 @@
+---
+title: "HealthStats Component"
+description: "Visualize weight trends with interactive charts"
+---
+
+## Overview
+
+The `HealthStats` component displays weight measurements over time using Chart.js for interactive data visualization. It prepares data for line charts showing weight trends and historical patterns.
+
+**Namespace:** `App\Livewire\History\HealthStats`  
+**Route:** `GET /stats`
+
+## Properties
+
+<ParamField path="weightLabels" type="array">
+  Array of formatted dates for the X-axis (e.g., `['01/01/2024', '05/01/2024']`)
+</ParamField>
+
+<ParamField path="weightData" type="array">
+  Array of weight values in kilograms for the Y-axis (e.g., `[75.5, 74.2, 73.8]`)
+</ParamField>
+
+## Methods
+
+### mount()
+
+Loads all weight measurements for the current user and prepares chart data.
+
+```php app/Livewire/History/HealthStats.php:14-28
+public function mount()
+{
+    $userId = auth()->id();
+
+    // Obtenemos los pesos ordenados por fecha ascendente (de antiguo a nuevo)
+    $weights = MeasurementWeight::where('user_id', $userId)
+        ->orderBy('date', 'asc')
+        ->get();
+
+    // Preparamos los arrays para Chart.js
+    foreach ($weights as $record) {
+        $this->weightLabels[] = $record->date->format('d/m/Y');
+        $this->weightData[] = $record->weight;
+    }
+}
+```
+
+**Data Ordering:** Weights are sorted by date in ascending order (oldest to newest) for chronological chart display.
+
+**Date Formatting:** Dates are formatted as `d/m/Y` (e.g., `25/01/2024`) for display on the chart.
+
+### render()
+
+Renders the statistics view with chart data.
+
+```php app/Livewire/History/HealthStats.php:30-33
+public function render()
+{
+    return view('livewire.history.health-stats')->layout('layouts.app');
+}
+```
+
+## Chart.js Integration
+
+The component passes data to the Blade view, which uses Chart.js to render the chart:
+
+```blade
+<canvas id="weightChart"></canvas>
+
+<script>
+const ctx = document.getElementById('weightChart').getContext('2d');
+const chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+        labels: @json($weightLabels),
+        datasets: [{
+            label: 'Weight (kg)',
+            data: @json($weightData),
+            borderColor: 'rgb(148, 203, 4)',
+            backgroundColor: 'rgba(148, 203, 4, 0.1)',
+            tension: 0.4
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            legend: {
+                display: true
+            },
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        return context.parsed.y.toFixed(2) + ' kg';
+                    }
+                }
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: false,
+                title: {
+                    display: true,
+                    text: 'Weight (kg)'
+                }
+            },
+            x: {
+                title: {
+                    display: true,
+                    text: 'Date'
+                }
+            }
+        }
+    }
+});
+</script>
+```
+
+## Example Chart Data
+
+If a user has these weight records:
+
+| Date | Weight |
+|------|--------|
+| 2024-01-01 | 75.5 kg |
+| 2024-01-08 | 74.8 kg |
+| 2024-01-15 | 74.2 kg |
+| 2024-01-22 | 73.9 kg |
+
+The component generates:
+
+```php
+$weightLabels = ['01/01/2024', '08/01/2024', '15/01/2024', '22/01/2024'];
+$weightData = [75.5, 74.8, 74.2, 73.9];
+```
+
+This produces a line chart showing a downward weight trend over time.
+
+## Future Enhancements
+
+The component currently only visualizes weight data. Potential additions:
+
+- **Blood pressure trends** - Systolic and diastolic over time
+- **Heart rate trends** - BPM patterns and anomalies
+- **Exercise frequency** - Activity counts per week/month
+- **Appointment history** - Timeline of medical visits
+- **Date range filtering** - View specific time periods (last 30/90 days, year)
+- **Goal tracking** - Compare actual vs target weight
+
+## Viewer Mode Support
+
+The component currently uses `auth()->id()` directly. To support viewer mode:
+
+```php
+// Add HasContext trait
+use App\Traits\HasContext;
+
+public function mount()
+{
+    $userId = $this->getTargetUserId(); // Instead of auth()->id()
+    
+    // Rest of the code...
+}
+```
+
+## Dependencies
+
+- **MeasurementWeight Model** - For weight data
+- **Chart.js** - JavaScript charting library (included in Blade view)
+- **Carbon** - For date formatting (via Laravel)
+
+## Related Components
+
+<CardGroup cols={2}>
+  <Card title="HealthHistory Component" icon="list" href="/api/livewire/health-history">
+    View detailed list of all records
+  </Card>
+  <Card title="MeasurementWeight Model" icon="weight-scale" href="/api/models/measurement-weight">
+    Weight measurement data model
+  </Card>
+</CardGroup>

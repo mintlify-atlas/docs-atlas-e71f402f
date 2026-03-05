@@ -42,7 +42,8 @@
               "features/calendar",
               "features/health-tracking",
               "features/appointments",
-              "features/data-sharing"
+              "features/data-sharing",
+              "features/history-and-stats"
             ]
           },
           {
@@ -90,7 +91,11 @@
             "pages": [
               "api/livewire/calendar",
               "api/livewire/health-tracking",
-              "api/livewire/data-sharing"
+              "api/livewire/data-sharing",
+              "api/livewire/context-switcher",
+              "api/livewire/record-details",
+              "api/livewire/health-history",
+              "api/livewire/health-stats"
             ]
           },
           {

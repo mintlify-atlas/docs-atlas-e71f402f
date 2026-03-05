@@ -1,0 +1,220 @@
+---
+title: "History & Statistics"
+description: "View, search, filter, and analyze your complete health record history"
+---
+
+## Overview
+
+Health Manager provides two powerful views for reviewing your health data: the **History** page for detailed record browsing and the **Statistics** page for visualizing trends over time.
+
+These features help you track progress, identify patterns, and maintain a comprehensive understanding of your health journey.
+
+## History View
+
+Access via the main navigation menu: **History**
+
+The History view displays all your health records in a unified, chronological list with powerful search and filtering capabilities.
+
+### Features
+
+<CardGroup cols={2}>
+  <Card title="Unified Timeline" icon="list">
+    All record types (appointments, exercises, weight, heart rate) in one list
+  </Card>
+  <Card title="Search & Filter" icon="magnifying-glass">
+    Find records quickly by keyword or filter by type
+  </Card>
+  <Card title="Pagination" icon="pager">
+    Configurable results per page (10, 20, 50, or 100 records)
+  </Card>
+  <Card title="Quick Actions" icon="bolt">
+    Edit or delete records directly from the list
+  </Card>
+</CardGroup>
+
+### Searching Records
+
+The search bar filters **appointments** and **exercises** by title and description:
+
+```
+Search: "cardiology" → Shows all appointments/exercises mentioning cardiology
+Search: "running" → Shows exercise sessions with "running" in the title/description
+```
+
+<Note>
+  Weight and heart rate measurements are not searchable (they don't have text fields). Use the type filter instead.
+</Note>
+
+### Filtering by Type
+
+Use the dropdown to show specific record types:
+
+- **All Types** - Shows everything (default)
+- **Appointments** - Medical appointments only
+- **Exercise** - Physical activity logs
+- **Weight** - Weight measurements
+- **Heart Rate** - Blood pressure and heart rate readings
+
+### Record Display
+
+Each record shows:
+
+**Medical Appointments:**
+- Title (e.g., "Cardiology Checkup")
+- Date and time
+- Description
+- Attachment count (if any)
+- Edit/Delete buttons
+
+**Exercise Activities:**
+- Title (e.g., "Morning Run")
+- Date and duration
+- Description
+- Attachment count (if any)
+- Edit/Delete buttons
+
+**Weight Measurements:**
+- Date
+- Weight value (kg)
+- Edit/Delete buttons
+
+**Heart Rate Measurements:**
+- Date
+- Blood pressure (systolic/diastolic)
+- Heart rate (BPM)
+- Edit/Delete buttons
+
+### Deleting Records
+
+<Warning>
+  Deleting a record is permanent and cannot be undone. For appointments and exercises, all attached files are also deleted from storage.
+</Warning>
+
+To delete a record:
+
+1. Click the **Delete** button on the record
+2. Confirm the deletion in the modal dialog
+3. The record and its attachments are permanently removed
+
+**Viewer Mode:** If you're viewing another user's data, delete buttons are hidden (read-only access).
+
+## Statistics View
+
+Access via the main navigation menu: **Statistics**
+
+The Statistics page visualizes your weight measurements over time using interactive charts.
+
+### Weight Trend Chart
+
+A line chart displays your weight progression:
+
+- **X-axis:** Dates of measurements
+- **Y-axis:** Weight values in kilograms
+- **Interactive:** Hover over data points to see exact values
+- **Responsive:** Automatically adjusts to screen size
+
+### Chart Features
+
+<CardGroup cols={2}>
+  <Card title="Chronological Order" icon="arrow-right">
+    Data points sorted from oldest to newest for clear trends
+  </Card>
+  <Card title="Visual Patterns" icon="chart-line">
+    Quickly identify weight loss, gain, or stability periods
+  </Card>
+  <Card title="Tooltips" icon="info-circle">
+    Hover over points to see date and exact weight
+  </Card>
+  <Card title="Date Formatting" icon="calendar">
+    Dates displayed in DD/MM/YYYY format (e.g., 25/01/2024)
+  </Card>
+</CardGroup>
+
+### Example Use Cases
+
+**Weight Loss Tracking:**
+- Monitor progress toward weight loss goals
+- Identify plateaus or fluctuations
+- Celebrate downward trends
+
+**Health Monitoring:**
+- Track weight changes after medication adjustments
+- Monitor weight during pregnancy or recovery
+- Identify unusual weight fluctuations for discussion with healthcare providers
+
+**Long-Term Trends:**
+- See seasonal patterns in weight
+- Compare year-over-year changes
+- Understand the impact of lifestyle changes
+
+## Pagination Controls
+
+Both History and Statistics pages support pagination for large datasets:
+
+**Per-Page Options:**
+- 10 records (best for mobile)
+- 20 records (default, balanced view)
+- 50 records (comprehensive)
+- 100 records (full overview)
+
+**Navigation:**
+- Previous/Next buttons
+- Jump to specific page numbers
+- Current page indicator
+
+## Context Switching
+
+<Info>
+  If another user has shared their data with you, you can switch contexts to view their history and statistics in read-only mode.
+</Info>
+
+When viewing shared data:
+- The user's name appears in the context switcher
+- All data displayed belongs to that user
+- Edit and delete buttons are hidden
+- You can switch back to your own data anytime
+
+## Future Statistics
+
+Health Manager currently visualizes weight trends. Future updates may include:
+
+- **Blood Pressure Trends** - Systolic and diastolic over time
+- **Heart Rate Patterns** - BPM trends and anomalies
+- **Exercise Frequency** - Activity counts per week/month
+- **Appointment Calendar** - Timeline of medical visits
+- **Goal Tracking** - Compare actual vs target metrics
+
+## Related Features
+
+<CardGroup cols={2}>
+  <Card title="Export Data" icon="file-pdf" href="/guides/exporting-data">
+    Download your complete history as a PDF report
+  </Card>
+  <Card title="Calendar View" icon="calendar" href="/features/calendar">
+    Browse records in a monthly calendar format
+  </Card>
+  <Card title="Data Sharing" icon="share-nodes" href="/features/data-sharing">
+    Share your data with family or healthcare providers
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/livewire/health-history">
+    Technical documentation for developers
+  </Card>
+</CardGroup>
+
+## Tips for Effective Use
+
+<Accordion title="Keep Regular Records">
+  Enter weight measurements consistently (e.g., every Monday morning) for more meaningful trend analysis.
+</Accordion>
+
+<Accordion title="Use Descriptive Titles">
+  When adding appointments and exercises, use clear, descriptive titles to make searching easier later.
+</Accordion>
+
+<Accordion title="Review Periodically">
+  Check your statistics monthly to identify trends and adjust health routines accordingly.
+</Accordion>
+
+<Accordion title="Export Before Major Changes">
+  Before changing medications or starting new treatments, export a PDF of your history for your healthcare provider.
+</Accordion>

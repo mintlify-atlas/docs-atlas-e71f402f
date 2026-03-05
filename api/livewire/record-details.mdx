@@ -1,0 +1,166 @@
+---
+title: "RecordDetails Component"
+description: "Display detailed view of health records in a modal"
+---
+
+## Overview
+
+The `RecordDetails` component displays detailed information about a specific health record (appointment, exercise, weight measurement, or heart rate measurement) in a modal window. It handles loading records dynamically based on their type and allows downloading associated attachments.
+
+**Namespace:** `App\Livewire\Dashboard\RecordDetails`
+
+## Properties
+
+<ParamField path="record" type="Model|null">
+  The loaded record instance (MedicalAppointment, ActivityExercise, MeasurementWeight, or MeasurementHeart)
+</ParamField>
+
+<ParamField path="type" type="string">
+  The type of record: `'MedicalAppointment'`, `'ActivityExercise'`, `'MeasurementWeight'`, or `'MeasurementHeart'`
+</ParamField>
+
+<ParamField path="isOpen" type="bool">
+  Whether the modal is currently open (unused in current implementation)
+</ParamField>
+
+## Event Listeners
+
+<ResponseField name="view-record" type="event">
+  Triggers `loadRecord($id, $type)` when a record is clicked from the calendar
+</ResponseField>
+
+```php app/Livewire/Dashboard/RecordDetails.php:19
+protected $listeners = ['view-record' => 'loadRecord'];
+```
+
+## Methods
+
+### loadRecord()
+
+Loads a record by ID and type, then opens the details modal.
+
+```php app/Livewire/Dashboard/RecordDetails.php:21-39
+public function loadRecord($id, $type)
+{
+    $modelClass = match($type) {
+        'MedicalAppointment' => MedicalAppointment::class,
+        'ActivityExercise' => ActivityExercise::class,
+        'MeasurementWeight' => MeasurementWeight::class,
+        'MeasurementHeart' => MeasurementHeart::class,
+        default => null,
+    };
+
+    if (!$modelClass) return;
+
+    $this->record = $modelClass::where('user_id', auth()->id())->find($id);
+    $this->type = $type;
+
+    if ($this->record) {
+        $this->dispatch('open-modal', 'record-details');
+    }
+}
+```
+
+<ParamField path="id" type="int" required>
+  The ID of the record to load
+</ParamField>
+
+<ParamField path="type" type="string" required>
+  One of: `MedicalAppointment`, `ActivityExercise`, `MeasurementWeight`, `MeasurementHeart`
+</ParamField>
+
+**Authorization:** Records are filtered by `user_id = auth()->id()` to ensure users can only view their own records.
+
+**Modal Dispatch:** Opens the `'record-details'` modal using Livewire's modal system.
+
+### downloadFile()
+
+Downloads an attachment file associated with the record.
+
+```php app/Livewire/Dashboard/RecordDetails.php:41-48
+public function downloadFile($attachmentId)
+{
+    $attachment = Attachment::where('user_id', auth()->id())->find($attachmentId);
+
+    if ($attachment && Storage::disk('local')->exists($attachment->file_path)) {
+        return Storage::disk('local')->download($attachment->file_path, $attachment->file_name);
+    }
+}
+```
+
+<ParamField path="attachmentId" type="int" required>
+  The ID of the attachment to download
+</ParamField>
+
+**Authorization:** Attachments are filtered by `user_id = auth()->id()`.
+
+**Storage:** Files are stored in the `local` disk (typically `storage/app/`).
+
+## Usage Example
+
+The component is included in the dashboard layout and listens for `view-record` events:
+
+```blade
+<livewire:dashboard.record-details />
+
+<x-modal name="record-details" focusable>
+    {{-- Modal content rendered by the component --}}
+</x-modal>
+```
+
+To trigger the modal from another component:
+
+```php
+// Dispatch event to open record details
+$this->dispatch('view-record', id: $recordId, type: 'MedicalAppointment');
+```
+
+## Record Type Matching
+
+The component uses PHP 8's `match()` expression to map string type names to model classes:
+
+| Type String | Model Class |
+|------------|-------------|
+| `MedicalAppointment` | `App\Models\MedicalAppointment` |
+| `ActivityExercise` | `App\Models\ActivityExercise` |
+| `MeasurementWeight` | `App\Models\MeasurementWeight` |
+| `MeasurementHeart` | `App\Models\MeasurementHeart` |
+
+## Modal Structure
+
+The modal displays different information based on record type:
+
+**Appointments & Exercise:**
+- Title
+- Date
+- Description
+- List of attachments with download buttons
+
+**Weight & Heart Rate:**
+- Date
+- Measurement values
+- Optional description (for weight)
+
+## Dependencies
+
+- **Storage Facade** - For file downloads
+- **Attachment Model** - For file metadata
+- **All health record models** - For loading records
+- **Livewire Modal System** - For displaying the modal
+
+## Security Considerations
+
+<Warning>
+  All database queries include `where('user_id', auth()->id())` to prevent unauthorized access to other users' records and attachments.
+</Warning>
+
+## Related Components
+
+<CardGroup cols={2}>
+  <Card title="Calendar Component" icon="calendar" href="/api/livewire/calendar">
+    Dispatches view-record events when days are clicked
+  </Card>
+  <Card title="Attachment Controller" icon="paperclip" href="/api/controllers/attachment">
+    Alternative attachment viewing method
+  </Card>
+</CardGroup>

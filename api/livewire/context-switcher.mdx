@@ -1,0 +1,104 @@
+---
+title: "ContextSwitcher Component"
+description: "View health data from users who have shared access with you"
+---
+
+## Overview
+
+The `ContextSwitcher` component allows users to switch between viewing their own health data and viewing data from other users who have granted them access. This enables family members, caregivers, and healthcare providers to view patient data in read-only mode.
+
+**Namespace:** `App\Livewire\Dashboard\ContextSwitcher`
+
+## Properties
+
+This component has no public properties - it reads directly from the session and database.
+
+## Methods
+
+### switchTo()
+
+Switches the viewing context to another user or back to the current user.
+
+```php app/Livewire/Dashboard/ContextSwitcher.php:11-22
+public function switchTo($userId)
+{
+    if (empty($userId) || $userId == auth()->id()) {
+        session()->forget('viewing_user_id');
+    } else {
+        if (auth()->user()->canView($userId)) {
+            session(['viewing_user_id' => $userId]);
+        }
+    }
+
+    return redirect(request()->header('Referer'));
+}
+```
+
+<ParamField path="userId" type="int|null">
+  The ID of the user to view. Pass `null` or the current user's ID to return to own data.
+</ParamField>
+
+**Authorization:** The method checks `auth()->user()->canView($userId)` before allowing the switch. If permission is denied, the context remains unchanged.
+
+**Session Storage:** The selected user ID is stored in `session('viewing_user_id')` and persists across page loads.
+
+### render()
+
+Renders the context switcher dropdown with available users.
+
+```php app/Livewire/Dashboard/ContextSwitcher.php:24-35
+public function render()
+{
+    $currentId = session('viewing_user_id', auth()->id());
+    $currentUser = User::find($currentId);
+
+    $accessibleUsers = auth()->user()->accessibleUsers;
+
+    return view('livewire.dashboard.context-switcher', [
+        'currentUser' => $currentUser,
+        'accessibleUsers' => $accessibleUsers
+    ]);
+}
+```
+
+**View Data:**
+- `currentUser` - The user whose data is currently being viewed
+- `accessibleUsers` - Collection of users who have shared their data with the logged-in user
+
+## Usage Example
+
+The context switcher is typically rendered in the application header/navbar:
+
+```blade
+<livewire:dashboard.context-switcher />
+```
+
+When a user selects another user from the dropdown, the component:
+1. Validates the user has `canView()` permission
+2. Stores the selected user ID in the session
+3. Redirects back to the current page
+4. All subsequent components read `session('viewing_user_id')` to display that user's data
+
+## Read-Only Mode
+
+When viewing another user's data (`session('viewing_user_id')` is set and differs from `auth()->id()`):
+- All create/edit/delete operations are disabled
+- The floating action button (FAB) is hidden or shows a "Viewer Mode" notice
+- Components check `$this->isReadOnly` before allowing modifications
+
+## Dependencies
+
+- **User Model** - Uses the `accessibleUsers` relationship to get the list of users
+- **Session** - Stores the viewing context across requests
+- **Permission System** - Relies on the `user_permissions` table
+
+## Related Components
+
+<CardGroup cols={2}>
+  <Card title="ShareData Component" icon="share-nodes" href="/api/livewire/data-sharing">
+    Grant and revoke viewing permissions
+  </Card>
+  <Card title="User Model" icon="user" href="/api/models/user">
+    See canView() method and permission relationships
+  </Card>
+</CardGroup>
