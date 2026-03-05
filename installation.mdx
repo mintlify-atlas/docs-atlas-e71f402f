@@ -1,0 +1,293 @@
+---
+title: 'Installation Guide'
+description: 'Complete installation guide for Health Manager on VPS and shared hosting environments'
+---
+
+## System Requirements
+
+Before installing Health Manager, ensure your server meets the following requirements:
+
+- **PHP 8.2 or higher** (PHP 8.4+ recommended)
+- **Required PHP Extensions:**
+  - Ctype
+  - cURL
+  - DOM
+  - Fileinfo
+  - Filter
+  - Hash
+  - Mbstring
+  - OpenSSL
+  - PCRE
+  - PDO
+  - Session
+  - Tokenizer
+  - XML
+- **Database:** MySQL, MariaDB, PostgreSQL, SQLite, or any [Laravel-compatible database](https://laravel.com/docs/12.x/database)
+- **Required Tools:**
+  - Git
+  - Composer
+  - NPM (Node.js)
+
+## Installation Methods
+
+Choose the installation method that best suits your hosting environment:
+
+<CardGroup cols={2}>
+  <Card title="VPS/SSH Installation" icon="terminal" href="#vps-installation">
+    For servers with console access (VPS, dedicated servers)
+  </Card>
+  <Card title="Shared Hosting" icon="server" href="#shared-hosting-installation">
+    For hosting without SSH access (FTP/cPanel)
+  </Card>
+</CardGroup>
+
+## VPS Installation
+
+<Note>
+  This method is for servers where you have SSH/console access. All commands are executed directly on the server.
+</Note>
+
+<Steps>
+  <Step title="Clone the Repository">
+    Clone the Health Manager repository to your server:
+
+    ```bash
+    git clone https://github.com/formatocd/health-manager.git
+    cd health-manager
+    ```
+  </Step>
+
+  <Step title="Install Dependencies">
+    Install PHP dependencies and build frontend assets:
+
+    ```bash
+    composer install --no-dev --optimize-autoloader
+    npm install && npm run build
+    ```
+
+    <Note>
+      The `--no-dev` flag ensures that development dependencies are not installed, optimizing for production.
+    </Note>
+  </Step>
+
+  <Step title="Configure Environment">
+    Create your environment configuration file and generate the application key:
+
+    ```bash
+    cp .env.example .env
+    php artisan key:generate
+    ```
+
+    <Warning>
+      Do not run migrations manually. The system will automatically run migrations when you first access the application.
+    </Warning>
+  </Step>
+
+  <Step title="Configure Web Server">
+    Point your web server's document root to the `public` directory:
+
+    <CodeGroup>
+      ```nginx Nginx Configuration
+      server {
+          listen 80;
+          server_name yourdomain.com;
+          root /path/to/health-manager/public;
+
+          add_header X-Frame-Options "SAMEORIGIN";
+          add_header X-Content-Type-Options "nosniff";
+
+          index index.php;
+
+          charset utf-8;
+
+          location / {
+              try_files $uri $uri/ /index.php?$query_string;
+          }
+
+          location = /favicon.ico { access_log off; log_not_found off; }
+          location = /robots.txt  { access_log off; log_not_found off; }
+
+          error_page 404 /index.php;
+
+          location ~ \.php$ {
+              fastcgi_pass unix:/var/run/php/php8.4-fpm.sock;
+              fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
+              include fastcgi_params;
+          }
+
+          location ~ /\.(?!well-known).* {
+              deny all;
+          }
+      }
+      ```
+
+      ```apache Apache Configuration
+      <VirtualHost *:80>
+          ServerName yourdomain.com
+          DocumentRoot /path/to/health-manager/public
+
+          <Directory /path/to/health-manager/public>
+              AllowOverride All
+              Require all granted
+          </Directory>
+      </VirtualHost>
+      ```
+    </CodeGroup>
+
+    <Warning>
+      **Critical:** Your web server must point to the `/public` directory, not the project root. This is essential for security.
+    </Warning>
+  </Step>
+
+  <Step title="Set File Permissions">
+    Ensure the web server has write permissions to storage and cache directories:
+
+    ```bash
+    chmod -R 775 storage bootstrap/cache
+    chown -R www-data:www-data storage bootstrap/cache
+    ```
+
+    <Note>
+      Replace `www-data` with your web server user if different (e.g., `nginx`, `apache`).
+    </Note>
+  </Step>
+</Steps>
+
+## Shared Hosting Installation
+
+<Note>
+  This method is for shared hosting environments without SSH access. You'll prepare the files locally and upload them via FTP or file manager.
+</Note>
+
+<Steps>
+  <Step title="Clone Repository Locally">
+    On your local computer, clone the repository:
+
+    ```bash
+    git clone https://github.com/formatocd/health-manager.git
+    cd health-manager
+    ```
+  </Step>
+
+  <Step title="Install Dependencies Locally">
+    Install all dependencies and build assets on your local machine:
+
+    ```bash
+    composer install --no-dev --optimize-autoloader
+    npm install && npm run build
+    ```
+
+    <Warning>
+      Make sure you run `npm run build` (not `npm run dev`) to create production-ready assets.
+    </Warning>
+  </Step>
+
+  <Step title="Configure Environment Locally">
+    Create the environment file and generate the application key:
+
+    ```bash
+    cp .env.example .env
+    php artisan key:generate
+    ```
+  </Step>
+
+  <Step title="Upload Files">
+    Upload **all** files and folders to your hosting provider, including:
+    
+    - `/vendor` directory (Composer dependencies)
+    - `/public/build` directory (compiled assets)
+    - All other project files and folders
+
+    <Note>
+      Use FTP, SFTP, or your hosting control panel's file manager. Ensure hidden files like `.env` are uploaded.
+    </Note>
+  </Step>
+
+  <Step title="Configure Public Directory">
+    Configure your hosting to point your domain to the `/public` directory:
+
+    - **cPanel:** Use the "Domains" or "Document Root" feature
+    - **Plesk:** Set the "Document root" in domain settings
+    - **Other panels:** Look for "Web Root" or "Public Directory" settings
+
+    <Warning>
+      If you cannot change the document root, you may need to move the contents of `/public` to your web root and adjust the paths in `index.php`.
+    </Warning>
+  </Step>
+</Steps>
+
+## Post-Installation
+
+After completing either installation method:
+
+<Steps>
+  <Step title="Edit Configuration">
+    Edit the `.env` file with your environment-specific settings. See the [Configuration Guide](/configuration) for detailed information.
+  </Step>
+
+  <Step title="First Access">
+    Navigate to your domain in a web browser. The system will:
+    
+    1. Automatically detect an empty database
+    2. Run migrations to create all necessary tables
+    3. Redirect you to the registration page
+
+    <Note>
+      **First User Takeover:** The first user to register will automatically become the administrator of the application.
+    </Note>
+  </Step>
+
+  <Step title="Create Administrator Account">
+    Register your account - this will be the administrator account with full access to all features including user management.
+  </Step>
+</Steps>
+
+## Verification
+
+To verify your installation is working correctly:
+
+1. Access your domain and ensure you're redirected to the registration page
+2. Register a new account (this becomes the admin account)
+3. Verify you can access the dashboard
+4. Check that the calendar interface loads properly
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="500 Internal Server Error">
+    - Check that your web server points to the `/public` directory
+    - Verify file permissions on `storage` and `bootstrap/cache` directories
+    - Check web server error logs for specific PHP errors
+    - Ensure `APP_KEY` is set in `.env` (run `php artisan key:generate`)
+  </Accordion>
+
+  <Accordion title="Blank Page or Assets Not Loading">
+    - Verify that `npm run build` completed successfully
+    - Check that `/public/build` directory exists and contains files
+    - Clear browser cache
+    - Check `APP_URL` in `.env` matches your domain
+  </Accordion>
+
+  <Accordion title="Database Connection Failed">
+    - Verify database credentials in `.env` are correct
+    - Ensure the database server is accessible from your application server
+    - Check that the database exists and the user has proper permissions
+  </Accordion>
+
+  <Accordion title="File Upload Issues">
+    - Check permissions on the `storage` directory
+    - Verify `php.ini` settings: `upload_max_filesize` and `post_max_size`
+    - Ensure `storage/app` directory is writable
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Configuration" icon="gear" href="/configuration">
+    Configure database, mail, and application settings
+  </Card>
+  <Card title="User Management" icon="users" href="/admin/user-management">
+    Learn how to manage users and permissions
+  </Card>
+</CardGroup>

@@ -1,0 +1,92 @@
+---
+title: First Login and Setup
+description: Learn how to set up Health Manager for the first time and configure your account
+---
+
+## Welcome to Health Manager
+
+Health Manager uses a "First User Takeover" policy to simplify the initial setup process. When you access the application for the first time, the system automatically handles database setup and grants you administrative privileges.
+
+## Initial Setup Process
+
+<Steps>
+  <Step title="Access the Application">
+    Navigate to your Health Manager installation URL in your web browser. The system will automatically detect that the database is empty.
+  </Step>
+
+  <Step title="Automatic Database Setup">
+    Health Manager will automatically create all necessary database tables. You don't need to run any manual migration commands.
+    
+    <Note>
+      The system handles database migrations automatically on first access, eliminating the need for command-line tools.
+    </Note>
+  </Step>
+
+  <Step title="Register Your Account">
+    You'll be redirected to the registration page. Fill in your details:
+    - Full name
+    - Email address
+    - Password
+    - Username (optional at registration, but recommended)
+    
+    <Info>
+      The first user to register automatically becomes the system administrator.
+    </Info>
+  </Step>
+
+  <Step title="Become Administrator">
+    Once you complete registration, you are automatically assigned the administrator role. This gives you access to:
+    - User management panel
+    - Full system settings
+    - Ability to manage other users
+  </Step>
+</Steps>
+
+## Setting Up Your Username
+
+After your initial login, it's important to set up your username (also called "Nick") so other users can find you when they want to share data.
+
+<Steps>
+  <Step title="Navigate to Your Profile">
+    Click on your profile icon or navigate to the Profile section.
+  </Step>
+
+  <Step title="Set Your Username">
+    Enter a unique username that others can use to find you. This username is required for data sharing features.
+    
+    <Tip>
+      Choose a username that's easy to remember and share with family members or healthcare providers.
+    </Tip>
+  </Step>
+</Steps>
+
+## Understanding Your Role
+
+As the first user, you have special privileges:
+
+- **Administrator Access**: Full control over user management and system settings
+- **User Management**: Ability to view and manage all registered users
+- **System Configuration**: Access to administrative panels
+
+<Note>
+  Only the first registered user receives automatic administrator privileges. All subsequent users will have standard user roles unless promoted by an administrator.
+</Note>
+
+## Next Steps
+
+Now that your account is set up, you can:
+
+- [Add health records](/guides/managing-records) to track your medical information
+- [Share your data](/guides/sharing-data) with family members or healthcare providers
+- [Export your data](/guides/exporting-data) to generate PDF reports
+
+## Important Security Notes
+
+<Info>
+  Make sure to configure your email settings in the `.env` file to enable password recovery and notifications.
+</Info>
+
+- Keep your administrator credentials secure
+- Use a strong password
+- Configure email settings for password recovery
+- Only grant administrator access to trusted users

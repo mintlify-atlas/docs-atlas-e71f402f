@@ -1,0 +1,266 @@
+---
+title: Permissions System
+description: Understand how the Health Manager permissions system controls data access and sharing between users.
+---
+
+## Overview
+
+Health Manager implements a granular permissions system that controls which users can view other users' health data. The system is based on explicit permission grants stored in the `user_permissions` table.
+
+## Permission Model
+
+The permissions system uses a many-to-many relationship between users with two distinct roles:
+
+- **Owner**: The user who owns the health data
+- **Viewer**: The user who has been granted permission to view the owner's data
+
+**Source:** `app/Models/User.php:67-75`
+
+### Database Structure
+
+The `user_permissions` table stores permission relationships:
+
+```sql
+user_permissions
+  - id: Primary key
+  - owner_id: Foreign key to users (who owns the data)
+  - viewer_id: Foreign key to users (who can view the data)
+  - created_at, updated_at: Timestamps
+  - UNIQUE constraint on (owner_id, viewer_id)
+```
+
+**Source:** `database/migrations/2026_01_23_193300_create_user_permissions_table.php`
+
+<Note>
+The unique constraint ensures that each permission grant is stored only once, preventing duplicate permissions.
+</Note>
+
+## Eloquent Relationships
+
+The User model defines two key relationships for managing permissions:
+
+### Allowed Viewers
+
+Returns all users who have permission to view this user's data:
+
+```php
+public function allowedViewers()
+{
+    return $this->belongsToMany(User::class, 'user_permissions', 'owner_id', 'viewer_id');
+}
+```
+
+**Example usage:**
+```php
+// Get all users who can view John's data
+$viewers = $john->allowedViewers;
+```
+
+### Accessible Users
+
+Returns all users whose data this user has permission to view:
+
+```php
+public function accessibleUsers()
+{
+    return $this->belongsToMany(User::class, 'user_permissions', 'viewer_id', 'owner_id');
+}
+```
+
+**Example usage:**
+```php
+// Get all users whose data John can view
+$accessibleUsers = $john->accessibleUsers;
+```
+
+## Checking Permissions
+
+The `canView()` method determines if a user has permission to view another user's data:
+
+**Source:** `app/Models/User.php:77-81`
+
+```php
+public function canView($targetUserId)
+{
+    return $this->id === $targetUserId ||
+           $this->accessibleUsers()->where('owner_id', $targetUserId)->exists();
+}
+```
+
+### Permission Logic
+
+A user can view data if either:
+
+1. **Self-access**: The user is viewing their own data (`$this->id === $targetUserId`)
+2. **Granted permission**: An explicit permission exists in the `user_permissions` table
+
+<Tip>
+Users always have full access to their own health data without needing explicit permissions.
+</Tip>
+
+## Use Cases
+
+### Family Health Sharing
+
+<Accordion title="Parent viewing child's health records">
+```php
+// Grant parent permission to view child's data
+$child->allowedViewers()->attach($parent->id);
+
+// Check permission
+if ($parent->canView($child->id)) {
+    // Display child's health data
+}
+```
+</Accordion>
+
+### Healthcare Provider Access
+
+<Accordion title="Doctor viewing patient records">
+```php
+// Grant doctor permission to view patient's data
+$patient->allowedViewers()->attach($doctor->id);
+
+// Revoke permission later
+$patient->allowedViewers()->detach($doctor->id);
+```
+</Accordion>
+
+### Caregiver Management
+
+<Accordion title="Elderly person sharing with caregiver">
+```php
+// Grant caregiver access
+$elderly->allowedViewers()->attach($caregiver->id);
+
+// Get all people the caregiver is caring for
+$patientsUnderCare = $caregiver->accessibleUsers;
+```
+</Accordion>
+
+## Cascade Deletion
+
+When a user is deleted, all associated permissions are automatically removed:
+
+```sql
+$table->foreignId('owner_id')->constrained('users')->onDelete('cascade');
+$table->foreignId('viewer_id')->constrained('users')->onDelete('cascade');
+```
+
+<Warning>
+Deleting a user will remove all permissions where they are either the owner or the viewer. This ensures no orphaned permission records remain in the database.
+</Warning>
+
+## Admin Permissions
+
+<Note>
+The current implementation does not explicitly grant admins access to all user data through the permissions system. Admin privileges are enforced at the route/middleware level, not the data access level.
+</Note>
+
+If you need admins to have universal data access, you can modify the `canView()` method:
+
+```php
+public function canView($targetUserId)
+{
+    // Allow admins to view all data
+    if ($this->isAdmin()) {
+        return true;
+    }
+    
+    return $this->id === $targetUserId ||
+           $this->accessibleUsers()->where('owner_id', $targetUserId)->exists();
+}
+```
+
+## Granting Permissions
+
+To grant a user permission to view another user's data:
+
+```php
+// Method 1: Using allowedViewers relationship
+$owner->allowedViewers()->attach($viewer->id);
+
+// Method 2: Using accessibleUsers relationship
+$viewer->accessibleUsers()->attach($owner->id);
+
+// Method 3: Direct database insert
+DB::table('user_permissions')->insert([
+    'owner_id' => $owner->id,
+    'viewer_id' => $viewer->id,
+    'created_at' => now(),
+    'updated_at' => now(),
+]);
+```
+
+## Revoking Permissions
+
+To revoke a user's viewing permission:
+
+```php
+// Method 1: Using allowedViewers relationship
+$owner->allowedViewers()->detach($viewer->id);
+
+// Method 2: Using accessibleUsers relationship
+$viewer->accessibleUsers()->detach($owner->id);
+
+// Revoke all permissions for an owner
+$owner->allowedViewers()->detach();
+
+// Revoke all permissions for a viewer
+$viewer->accessibleUsers()->detach();
+```
+
+## Checking Multiple Permissions
+
+```php
+// Check if viewer has permission for multiple owners
+$targetUserIds = [1, 2, 3, 4, 5];
+$accessibleIds = $viewer->accessibleUsers()
+    ->whereIn('owner_id', $targetUserIds)
+    ->pluck('owner_id')
+    ->toArray();
+
+// Get all health records the viewer can access
+$healthRecords = HealthMeasurement::whereIn('user_id', function($query) use ($viewer) {
+    $query->select('owner_id')
+          ->from('user_permissions')
+          ->where('viewer_id', $viewer->id);
+})->orWhere('user_id', $viewer->id)->get();
+```
+
+## Performance Considerations
+
+<Tip>
+The unique constraint on `(owner_id, viewer_id)` creates an index that makes permission lookups very fast, even with thousands of users.
+</Tip>
+
+### Query Optimization
+
+```php
+// Efficient: Uses the index
+$canView = $user->accessibleUsers()
+    ->where('owner_id', $targetUserId)
+    ->exists();
+
+// Less efficient: Loads all relationships
+$canView = $user->accessibleUsers->contains($targetUserId);
+```
+
+## Security Considerations
+
+1. **Always validate permissions**: Check `canView()` before displaying any user's health data
+2. **Use middleware**: Implement permission checks at the route level for additional security
+3. **Audit trails**: Consider adding a separate audit log table to track permission changes
+4. **Time-based permissions**: For temporary access, add `expires_at` column to the permissions table
+5. **Permission types**: For different levels of access (read-only, read-write), add a `permission_type` column
+
+## Future Enhancements
+
+<Accordion title="Suggested improvements to the permissions system">
+- **Permission levels**: Implement read-only vs. read-write permissions
+- **Temporary access**: Add expiration dates to permissions
+- **Permission requests**: Allow users to request access, requiring owner approval
+- **Granular permissions**: Control access to specific data types (medications only, measurements only, etc.)
+- **Group permissions**: Create user groups (family, healthcare team) for easier management
+- **Audit logging**: Track when permissions are granted, used, and revoked
+</Accordion>

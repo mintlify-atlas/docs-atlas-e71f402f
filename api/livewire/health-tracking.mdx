@@ -1,0 +1,384 @@
+---
+title: Health Tracking Components
+description: Weight and heart rate logging components for tracking health measurements
+---
+
+## Overview
+
+The Health Tracking components provide interfaces for logging and editing weight measurements and heart rate data. Both components support creating new records and editing existing ones.
+
+## WeightLog Component
+
+### Class Information
+
+**Namespace:** `App\Livewire\Dashboard`
+
+**Class:** `WeightLog`
+
+### Public Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `weightId` | `int\|null` | ID of the weight record being edited (null for new records) |
+| `weight` | `float` | Weight value in kg |
+| `date` | `string` | Date and time of measurement (Y-m-d\TH:i format) |
+| `description` | `string` | Optional description (not used in validation) |
+
+### Methods
+
+#### mount()
+
+Initializes the component with the current date and time.
+
+```php
+public function mount()
+{
+    $this->date = Carbon::now()->format('Y-m-d\TH:i');
+}
+```
+
+#### editWeight($id)
+
+Loads an existing weight record for editing.
+
+**Parameters:**
+- `$id` (int) - The ID of the weight record to edit
+
+```php
+public function editWeight($id)
+{
+    $record = MeasurementWeight::find($id);
+
+    if (!$record || $record->user_id !== auth()->id()) {
+        return;
+    }
+
+    $this->weightId = $record->id;
+    $this->weight = $record->weight;
+    $this->date = Carbon::parse($record->date)->format('Y-m-d\TH:i');
+
+    $this->dispatch('open-modal', 'log-weight');
+}
+```
+
+**Security:** Only allows editing records belonging to the authenticated user.
+
+#### save()
+
+Validates and saves the weight record (creates new or updates existing).
+
+```php
+public function save()
+{
+    $this->validate([
+        'weight' => 'required|numeric|min:1|max:500',
+        'date' => 'required|date',
+    ]);
+
+    if ($this->weightId) {
+        $record = MeasurementWeight::where('user_id', auth()->id())->find($this->weightId);
+        if ($record) {
+            $record->update([
+                'weight' => $this->weight,
+                'date' => $this->date,
+            ]);
+        }
+    } else {
+        MeasurementWeight::create([
+            'user_id' => auth()->id(),
+            'weight' => $this->weight,
+            'date' => $this->date,
+        ]);
+    }
+
+    $this->reset(['weight', 'weightId']);
+    $this->date = Carbon::now()->format('Y-m-d\TH:i');
+
+    $this->dispatch('close-modal', 'log-weight');
+    $this->dispatch('refresh-calendar');
+    $this->dispatch('refresh-history');
+}
+```
+
+### Validation Rules
+
+| Field | Rules | Description |
+|-------|-------|-------------|
+| `weight` | required, numeric, min:1, max:500 | Weight in kg (1-500) |
+| `date` | required, date | Date and time of measurement |
+
+### Event Listeners
+
+| Event | Method | Description |
+|-------|--------|-------------|
+| `edit-weight-item` | `editWeight($id)` | Opens the edit form for a weight record |
+
+### Event Dispatchers
+
+| Event | Parameters | Triggered When |
+|-------|-----------|----------------|
+| `open-modal` | `'log-weight'` | Opening the edit form |
+| `close-modal` | `'log-weight'` | After successful save |
+| `refresh-calendar` | - | After successful save |
+| `refresh-history` | - | After successful save |
+
+### Component Usage
+
+```php
+<livewire:dashboard.weight-log />
+```
+
+### Blade Template Example
+
+```php
+<form wire:submit="save">
+    <div>
+        <label for="weight">Weight (kg)</label>
+        <input 
+            type="number" 
+            id="weight" 
+            wire:model="weight" 
+            step="0.1" 
+            min="1" 
+            max="500"
+        />
+        @error('weight') <span class="error">{{ $message }}</span> @enderror
+    </div>
+
+    <div>
+        <label for="date">Date & Time</label>
+        <input 
+            type="datetime-local" 
+            id="date" 
+            wire:model="date"
+        />
+        @error('date') <span class="error">{{ $message }}</span> @enderror
+    </div>
+
+    <button type="submit">
+        {{ $weightId ? 'Update' : 'Save' }} Weight
+    </button>
+</form>
+```
+
+---
+
+## HeartLog Component
+
+### Class Information
+
+**Namespace:** `App\Livewire\Dashboard`
+
+**Class:** `HeartLog`
+
+### Public Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `heartId` | `int\|null` | ID of the heart record being edited (null for new records) |
+| `systolic` | `int` | Systolic blood pressure (upper number) |
+| `diastolic` | `int` | Diastolic blood pressure (lower number) |
+| `bpm` | `int` | Heart rate in beats per minute |
+| `date` | `string` | Date and time of measurement (Y-m-d\TH:i format) |
+
+### Methods
+
+#### mount()
+
+Initializes the component with the current date and time.
+
+```php
+public function mount()
+{
+    $this->date = Carbon::now()->format('Y-m-d\TH:i');
+}
+```
+
+#### editHeart($id)
+
+Loads an existing heart measurement record for editing.
+
+**Parameters:**
+- `$id` (int) - The ID of the heart record to edit
+
+```php
+public function editHeart($id)
+{
+    $record = MeasurementHeart::find($id);
+
+    if (!$record || $record->user_id !== auth()->id()) {
+        return;
+    }
+
+    $this->heartId = $record->id;
+    $this->systolic = $record->systolic;
+    $this->diastolic = $record->diastolic;
+    $this->bpm = $record->bpm;
+    $this->date = Carbon::parse($record->date)->format('Y-m-d\TH:i');
+
+    $this->dispatch('open-modal', 'log-heart');
+}
+```
+
+**Security:** Only allows editing records belonging to the authenticated user.
+
+#### save()
+
+Validates and saves the heart measurement record (creates new or updates existing).
+
+```php
+public function save()
+{
+    $this->validate([
+        'systolic' => 'required|integer|min:50|max:250',
+        'diastolic' => 'required|integer|min:30|max:150',
+        'bpm' => 'required|integer|min:30|max:220',
+        'date' => 'required|date',
+    ]);
+
+    $data = [
+        'systolic' => $this->systolic,
+        'diastolic' => $this->diastolic,
+        'bpm' => $this->bpm,
+        'date' => $this->date
+    ];
+
+    if ($this->heartId) {
+        $record = MeasurementHeart::where('user_id', auth()->id())->find($this->heartId);
+        if ($record) {
+            $record->update($data);
+        }
+    } else {
+        MeasurementHeart::create(array_merge($data, ['user_id' => auth()->id()]));
+    }
+
+    $this->reset(['systolic', 'diastolic', 'bpm', 'heartId']);
+    $this->date = Carbon::now()->format('Y-m-d\TH:i');
+
+    $this->dispatch('close-modal', 'log-heart');
+    $this->dispatch('refresh-calendar');
+    $this->dispatch('refresh-history');
+}
+```
+
+### Validation Rules
+
+| Field | Rules | Description |
+|-------|-------|-------------|
+| `systolic` | required, integer, min:50, max:250 | Systolic pressure (50-250 mmHg) |
+| `diastolic` | required, integer, min:30, max:150 | Diastolic pressure (30-150 mmHg) |
+| `bpm` | required, integer, min:30, max:220 | Heart rate (30-220 BPM) |
+| `date` | required, date | Date and time of measurement |
+
+### Event Listeners
+
+| Event | Method | Description |
+|-------|--------|-------------|
+| `edit-heart-item` | `editHeart($id)` | Opens the edit form for a heart record |
+
+### Event Dispatchers
+
+| Event | Parameters | Triggered When |
+|-------|-----------|----------------|
+| `open-modal` | `'log-heart'` | Opening the edit form |
+| `close-modal` | `'log-heart'` | After successful save |
+| `refresh-calendar` | - | After successful save |
+| `refresh-history` | - | After successful save |
+
+### Component Usage
+
+```php
+<livewire:dashboard.heart-log />
+```
+
+### Blade Template Example
+
+```php
+<form wire:submit="save">
+    <div>
+        <label for="systolic">Systolic (mmHg)</label>
+        <input 
+            type="number" 
+            id="systolic" 
+            wire:model="systolic" 
+            min="50" 
+            max="250"
+        />
+        @error('systolic') <span class="error">{{ $message }}</span> @enderror
+    </div>
+
+    <div>
+        <label for="diastolic">Diastolic (mmHg)</label>
+        <input 
+            type="number" 
+            id="diastolic" 
+            wire:model="diastolic" 
+            min="30" 
+            max="150"
+        />
+        @error('diastolic') <span class="error">{{ $message }}</span> @enderror
+    </div>
+
+    <div>
+        <label for="bpm">Heart Rate (BPM)</label>
+        <input 
+            type="number" 
+            id="bpm" 
+            wire:model="bpm" 
+            min="30" 
+            max="220"
+        />
+        @error('bpm') <span class="error">{{ $message }}</span> @enderror
+    </div>
+
+    <div>
+        <label for="date">Date & Time</label>
+        <input 
+            type="datetime-local" 
+            id="date" 
+            wire:model="date"
+        />
+        @error('date') <span class="error">{{ $message }}</span> @enderror
+    </div>
+
+    <button type="submit">
+        {{ $heartId ? 'Update' : 'Save' }} Measurement
+    </button>
+</form>
+```
+
+## Common Patterns
+
+### Listening for Edit Events
+
+```php
+<!-- In a list of weight records -->
+@foreach($weights as $weight)
+    <div>
+        {{ $weight->weight }} kg - {{ $weight->date->format('M d, Y') }}
+        <button wire:click="$dispatch('edit-weight-item', { id: {{ $weight->id }} })">
+            Edit
+        </button>
+    </div>
+@endforeach
+
+<!-- In a list of heart records -->
+@foreach($hearts as $heart)
+    <div>
+        {{ $heart->systolic }}/{{ $heart->diastolic }} mmHg, {{ $heart->bpm }} BPM
+        <button wire:click="$dispatch('edit-heart-item', { id: {{ $heart->id }} })">
+            Edit
+        </button>
+    </div>
+@endforeach
+```
+
+## Dependencies
+
+### WeightLog
+- `Carbon\Carbon` - Date manipulation
+- `App\Models\MeasurementWeight` - Weight measurement model
+
+### HeartLog
+- `Carbon\Carbon` - Date manipulation
+- `App\Models\MeasurementHeart` - Heart measurement model

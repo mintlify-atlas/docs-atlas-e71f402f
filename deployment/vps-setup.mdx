@@ -1,0 +1,490 @@
+---
+title: VPS Deployment Guide
+description: Complete guide to deploy Health Manager on a VPS with console access via SSH
+---
+
+This guide covers deploying Health Manager on a Virtual Private Server (VPS) or any hosting environment with SSH/console access.
+
+## Requirements
+
+Before starting, ensure your VPS meets these requirements:
+
+- **PHP 8.4** or higher
+- **Composer** (PHP dependency manager)
+- **Node.js & NPM** (for building frontend assets)
+- **Git** (for cloning the repository)
+- **Web Server** (Nginx or Apache)
+- **Database** (MySQL, MariaDB, PostgreSQL, or SQLite)
+- **SSL Certificate** (recommended for production)
+
+### Required PHP Extensions
+
+Health Manager requires the following PHP extensions:
+
+- Ctype
+- cURL
+- DOM
+- Fileinfo
+- Filter
+- Hash
+- Mbstring
+- OpenSSL
+- PCRE
+- PDO
+- Session
+- Tokenizer
+- XML
+- BCMath
+- Zip
+- Intl
+- GD (for image processing)
+- Exif
+
+## Installation Steps
+
+<Steps>
+
+### Clone the Repository
+
+Connect to your VPS via SSH and clone the Health Manager repository:
+
+```bash
+git clone https://github.com/formatocd/health-manager.git
+cd health-manager
+```
+
+### Install Dependencies
+
+Install PHP dependencies with Composer and build frontend assets with NPM:
+
+<CodeGroup>
+
+```bash Composer & NPM
+composer install --no-dev --optimize-autoloader
+npm install && npm run build
+```
+
+```bash Composer Only
+composer install --no-dev --optimize-autoloader
+```
+
+```bash NPM Only
+npm install && npm run build
+```
+
+</CodeGroup>
+
+<Warning>
+The `--no-dev` flag excludes development dependencies, keeping your production environment lean and secure.
+</Warning>
+
+### Initial Configuration
+
+Create your environment configuration file and generate the application key:
+
+```bash
+cp .env.example .env
+php artisan key:generate
+```
+
+<Warning>
+**Important:** Do not run database migrations manually. Health Manager uses an auto-installation system that creates tables automatically on first access.
+</Warning>
+
+</Steps>
+
+## Environment Configuration
+
+Edit the `.env` file to configure your application:
+
+### Production Settings
+
+```env
+APP_NAME="Health Manager"
+APP_ENV=production
+APP_DEBUG=false
+APP_URL=https://yourdomain.com
+APP_LOCALE=en
+```
+
+<Warning>
+**Security:** Always set `APP_DEBUG=false` in production to prevent sensitive information leaks.
+</Warning>
+
+### Database Configuration
+
+<CodeGroup>
+
+```env MySQL/MariaDB
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=health_manager
+DB_USERNAME=your_username
+DB_PASSWORD=your_secure_password
+```
+
+```env PostgreSQL
+DB_CONNECTION=pgsql
+DB_HOST=127.0.0.1
+DB_PORT=5432
+DB_DATABASE=health_manager
+DB_USERNAME=postgres
+DB_PASSWORD=your_secure_password
+```
+
+```env SQLite
+DB_CONNECTION=sqlite
+# No additional configuration needed
+# Database file will be created at database/database.sqlite
+```
+
+</CodeGroup>
+
+### Mail Configuration
+
+Configure SMTP settings for email notifications and password recovery:
+
+```env
+MAIL_MAILER=smtp
+MAIL_HOST=smtp.yourserver.com
+MAIL_PORT=587
+MAIL_USERNAME=your_email@yourdomain.com
+MAIL_PASSWORD=your_email_password
+MAIL_ENCRYPTION=tls
+MAIL_FROM_ADDRESS="no-reply@yourdomain.com"
+MAIL_FROM_NAME="${APP_NAME}"
+```
+
+<Accordion title="Common SMTP Providers Configuration">
+
+**Gmail:**
+```env
+MAIL_HOST=smtp.gmail.com
+MAIL_PORT=587
+MAIL_ENCRYPTION=tls
+```
+
+**Mailgun:**
+```env
+MAIL_HOST=smtp.mailgun.org
+MAIL_PORT=587
+MAIL_ENCRYPTION=tls
+```
+
+**SendGrid:**
+```env
+MAIL_HOST=smtp.sendgrid.net
+MAIL_PORT=587
+MAIL_ENCRYPTION=tls
+```
+
+</Accordion>
+
+## Web Server Configuration
+
+<Warning>
+**Critical:** Your web server must point to the `/public` directory, not the project root. This is essential for security.
+</Warning>
+
+### Nginx Configuration
+
+Create a new Nginx server block configuration:
+
+```nginx /etc/nginx/sites-available/health-manager
+server {
+    listen 80;
+    listen [::]:80;
+    server_name yourdomain.com;
+    root /path/to/health-manager/public;
+
+    add_header X-Frame-Options "SAMEORIGIN";
+    add_header X-Content-Type-Options "nosniff";
+
+    index index.php;
+
+    charset utf-8;
+
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    location = /favicon.ico { access_log off; log_not_found off; }
+    location = /robots.txt  { access_log off; log_not_found off; }
+
+    error_page 404 /index.php;
+
+    location ~ \.php$ {
+        fastcgi_pass unix:/var/run/php/php8.4-fpm.sock;
+        fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
+        include fastcgi_params;
+    }
+
+    location ~ /\.(?!well-known).* {
+        deny all;
+    }
+}
+```
+
+Enable the site and restart Nginx:
+
+```bash
+ln -s /etc/nginx/sites-available/health-manager /etc/nginx/sites-enabled/
+nginx -t
+systemctl restart nginx
+```
+
+### Apache Configuration
+
+Create a virtual host configuration:
+
+```apache /etc/apache2/sites-available/health-manager.conf
+<VirtualHost *:80>
+    ServerName yourdomain.com
+    DocumentRoot /path/to/health-manager/public
+
+    <Directory /path/to/health-manager/public>
+        AllowOverride All
+        Require all granted
+    </Directory>
+
+    ErrorLog ${APACHE_LOG_DIR}/health-manager-error.log
+    CustomLog ${APACHE_LOG_DIR}/health-manager-access.log combined
+</VirtualHost>
+```
+
+Enable required modules and the site:
+
+```bash
+a2enmod rewrite
+a2ensite health-manager
+systemctl restart apache2
+```
+
+## File Permissions
+
+Set proper permissions for Laravel directories:
+
+```bash
+chown -R www-data:www-data /path/to/health-manager
+chmod -R 775 /path/to/health-manager/storage
+chmod -R 775 /path/to/health-manager/bootstrap/cache
+```
+
+<Warning>
+Replace `www-data` with your web server user if different (e.g., `nginx`, `apache`, or `httpd`).
+</Warning>
+
+## SSL/TLS Configuration (Recommended)
+
+Secure your application with a free SSL certificate using Let's Encrypt:
+
+### Install Certbot
+
+<CodeGroup>
+
+```bash Ubuntu/Debian
+sudo apt update
+sudo apt install certbot python3-certbot-nginx
+```
+
+```bash CentOS/RHEL
+sudo yum install certbot python3-certbot-nginx
+```
+
+</CodeGroup>
+
+### Obtain Certificate
+
+```bash
+sudo certbot --nginx -d yourdomain.com
+```
+
+Certbot will automatically modify your Nginx configuration to use HTTPS.
+
+### Update .env File
+
+Update your `APP_URL` to use HTTPS:
+
+```env
+APP_URL=https://yourdomain.com
+```
+
+## First Access & Admin Creation
+
+Health Manager uses a **"First User Takeover"** system:
+
+<Steps>
+
+### Navigate to Your Domain
+
+Visit your domain in a web browser (e.g., `https://yourdomain.com`).
+
+### Automatic Database Setup
+
+The system will detect an empty database and automatically create all necessary tables.
+
+### Register First User
+
+You'll be redirected to the registration page. The first user to register becomes the **administrator**.
+
+### Start Using Health Manager
+
+After registration, you'll have full administrative access to the application.
+
+</Steps>
+
+<Warning>
+**Security Tip:** Register your admin account immediately after deployment to prevent unauthorized users from claiming admin rights.
+</Warning>
+
+## Performance Optimization
+
+### Enable OPcache
+
+Add to your PHP configuration (`/etc/php/8.4/fpm/php.ini`):
+
+```ini
+opcache.enable=1
+opcache.memory_consumption=128
+opcache.interned_strings_buffer=8
+opcache.max_accelerated_files=10000
+opcache.validate_timestamps=0
+```
+
+### Cache Configuration
+
+Optimize Laravel's configuration cache:
+
+```bash
+php artisan config:cache
+php artisan route:cache
+php artisan view:cache
+```
+
+<Warning>
+Run these commands after any configuration changes to apply updates.
+</Warning>
+
+## Troubleshooting
+
+<Accordion title="500 Internal Server Error">
+
+**Possible causes:**
+
+1. **Incorrect permissions:** Ensure `storage` and `bootstrap/cache` directories are writable
+   ```bash
+   chmod -R 775 storage bootstrap/cache
+   ```
+
+2. **Missing APP_KEY:** Generate a new application key
+   ```bash
+   php artisan key:generate
+   ```
+
+3. **Check error logs:**
+   ```bash
+   tail -f storage/logs/laravel.log
+   ```
+
+</Accordion>
+
+<Accordion title="Database Connection Error">
+
+1. Verify database credentials in `.env`
+2. Ensure database server is running
+3. Check if database user has proper permissions
+4. Test connection:
+   ```bash
+   php artisan tinker
+   DB::connection()->getPdo();
+   ```
+
+</Accordion>
+
+<Accordion title="Assets Not Loading">
+
+1. Verify web server points to `/public` directory
+2. Check if `public/build` directory exists
+3. Rebuild assets:
+   ```bash
+   npm run build
+   ```
+4. Clear browser cache
+
+</Accordion>
+
+<Accordion title="Email Not Sending">
+
+1. Verify SMTP configuration in `.env`
+2. Check if firewall allows outbound SMTP connections
+3. Test mail configuration:
+   ```bash
+   php artisan tinker
+   Mail::raw('Test email', function($msg) { $msg->to('test@example.com')->subject('Test'); });
+   ```
+4. Review logs:
+   ```bash
+   tail -f storage/logs/laravel.log
+   ```
+
+</Accordion>
+
+<Accordion title="Permission Denied Errors">
+
+Ensure proper ownership and permissions:
+
+```bash
+# Set ownership
+chown -R www-data:www-data /path/to/health-manager
+
+# Set directory permissions
+find /path/to/health-manager -type d -exec chmod 755 {} \;
+
+# Set file permissions
+find /path/to/health-manager -type f -exec chmod 644 {} \;
+
+# Set storage permissions
+chmod -R 775 storage bootstrap/cache
+```
+
+</Accordion>
+
+## Maintenance & Updates
+
+### Update Application
+
+To update Health Manager to the latest version:
+
+```bash
+cd /path/to/health-manager
+git pull origin main
+composer install --no-dev --optimize-autoloader
+npm install && npm run build
+php artisan config:cache
+php artisan route:cache
+php artisan view:cache
+```
+
+### Backup
+
+Regularly backup your database and `.env` file:
+
+```bash
+# Backup database (MySQL example)
+mysqldump -u username -p health_manager > backup-$(date +%Y%m%d).sql
+
+# Backup .env file
+cp .env .env.backup
+
+# Backup uploaded files
+tar -czf storage-backup-$(date +%Y%m%d).tar.gz storage/app
+```
+
+## Next Steps
+
+- Configure user roles and permissions in the admin panel
+- Customize email templates
+- Set up automated backups
+- Configure monitoring and logging
+- Review security best practices

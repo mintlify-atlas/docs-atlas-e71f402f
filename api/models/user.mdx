@@ -1,0 +1,339 @@
+---
+title: 'User Model'
+description: 'Complete documentation for the User model including authentication, permissions, and relationships'
+---
+
+## Overview
+
+The `User` model extends Laravel's `Authenticatable` class and serves as the core authentication model for Health Manager. It includes role-based access control, user permissions, and self-provisioning admin functionality.
+
+### Namespace
+
+```php
+App\Models\User
+```
+
+### Class Declaration
+
+```php
+class User extends Authenticatable
+```
+
+## Database Schema
+
+The `users` table includes the following columns:
+
+<ResponseField name="id" type="bigint" required>
+  Primary key, auto-incrementing
+</ResponseField>
+
+<ResponseField name="name" type="string" required>
+  User's full name
+</ResponseField>
+
+<ResponseField name="email" type="string" required>
+  User's email address (unique)
+</ResponseField>
+
+<ResponseField name="username" type="string" required>
+  User's unique username for login
+</ResponseField>
+
+<ResponseField name="password" type="string" required>
+  Hashed password
+</ResponseField>
+
+<ResponseField name="role" type="string" default="user">
+  User role (either 'admin' or 'user')
+</ResponseField>
+
+<ResponseField name="email_verified_at" type="timestamp">
+  Email verification timestamp
+</ResponseField>
+
+<ResponseField name="remember_token" type="string">
+  Remember me token for persistent sessions
+</ResponseField>
+
+<ResponseField name="created_at" type="timestamp">
+  Record creation timestamp
+</ResponseField>
+
+<ResponseField name="updated_at" type="timestamp">
+  Record last update timestamp
+</ResponseField>
+
+## Fillable Attributes
+
+These attributes can be mass assigned:
+
+<ParamField path="name" type="string" required>
+  User's full name
+</ParamField>
+
+<ParamField path="email" type="string" required>
+  User's email address
+</ParamField>
+
+<ParamField path="username" type="string" required>
+  Unique username for authentication
+</ParamField>
+
+<ParamField path="password" type="string" required>
+  User's password (will be automatically hashed)
+</ParamField>
+
+<ParamField path="role" type="string" default="user">
+  User role: 'admin' or 'user'
+</ParamField>
+
+## Hidden Attributes
+
+These attributes are automatically hidden from JSON serialization:
+
+- `password`
+- `remember_token`
+
+## Casts
+
+```php
+[
+    'email_verified_at' => 'datetime',
+    'password' => 'hashed',
+]
+```
+
+## Relationships
+
+### allowedViewers()
+
+Defines users who have permission to view this user's health data.
+
+<Expandable title="Relationship Details">
+  <ResponseField name="type" type="belongsToMany">
+    Many-to-many relationship
+  </ResponseField>
+  
+  <ResponseField name="related" type="User">
+    Related to User model
+  </ResponseField>
+  
+  <ResponseField name="table" type="user_permissions">
+    Pivot table name
+  </ResponseField>
+  
+  <ResponseField name="foreignPivotKey" type="owner_id">
+    Foreign key on pivot table
+  </ResponseField>
+  
+  <ResponseField name="relatedPivotKey" type="viewer_id">
+    Related key on pivot table
+  </ResponseField>
+</Expandable>
+
+```php
+public function allowedViewers()
+{
+    return $this->belongsToMany(User::class, 'user_permissions', 'owner_id', 'viewer_id');
+}
+```
+
+### accessibleUsers()
+
+Defines users whose health data this user has permission to view.
+
+<Expandable title="Relationship Details">
+  <ResponseField name="type" type="belongsToMany">
+    Many-to-many relationship
+  </ResponseField>
+  
+  <ResponseField name="related" type="User">
+    Related to User model
+  </ResponseField>
+  
+  <ResponseField name="table" type="user_permissions">
+    Pivot table name
+  </ResponseField>
+  
+  <ResponseField name="foreignPivotKey" type="viewer_id">
+    Foreign key on pivot table
+  </ResponseField>
+  
+  <ResponseField name="relatedPivotKey" type="owner_id">
+    Related key on pivot table
+  </ResponseField>
+</Expandable>
+
+```php
+public function accessibleUsers()
+{
+    return $this->belongsToMany(User::class, 'user_permissions', 'viewer_id', 'owner_id');
+}
+```
+
+## Methods
+
+### isAdmin()
+
+Checks if the user has admin role.
+
+<ParamField path="return" type="bool">
+  Returns `true` if user role is 'admin', `false` otherwise
+</ParamField>
+
+```php
+public function isAdmin(): bool
+{
+    return $this->role === 'admin';
+}
+```
+
+**Example Usage:**
+
+```php
+$user = User::find(1);
+
+if ($user->isAdmin()) {
+    // Grant admin access
+    echo "Welcome, administrator!";
+}
+```
+
+### canView()
+
+Checks if the user can view a target user's health data.
+
+<ParamField path="targetUserId" type="int" required>
+  The ID of the user whose data access is being checked
+</ParamField>
+
+<ParamField path="return" type="bool">
+  Returns `true` if user can view target user's data
+</ParamField>
+
+```php
+public function canView($targetUserId)
+{
+    return $this->id === $targetUserId ||
+           $this->accessibleUsers()->where('owner_id', $targetUserId)->exists();
+}
+```
+
+**Example Usage:**
+
+```php
+$currentUser = auth()->user();
+$targetUserId = 5;
+
+if ($currentUser->canView($targetUserId)) {
+    // User can view this data
+    $measurements = MeasurementWeight::where('user_id', $targetUserId)->get();
+}
+```
+
+## Boot Method
+
+The User model includes a boot method that automatically assigns the 'admin' role to the first user created in the system.
+
+```php
+protected static function boot()
+{
+    parent::boot();
+
+    static::creating(function ($user) {
+        if (static::count() === 0) {
+            $user->role = 'admin';
+        }
+    });
+}
+```
+
+## Usage Examples
+
+### Creating a New User
+
+```php
+// First user becomes admin automatically
+$admin = User::create([
+    'name' => 'John Admin',
+    'email' => 'admin@example.com',
+    'username' => 'johnadmin',
+    'password' => 'secure-password', // Will be hashed automatically
+    'role' => 'user', // Will be overridden to 'admin' for first user
+]);
+
+// Subsequent users have 'user' role
+$user = User::create([
+    'name' => 'Jane Doe',
+    'email' => 'jane@example.com',
+    'username' => 'janedoe',
+    'password' => 'secure-password',
+]);
+```
+
+### Managing User Permissions
+
+```php
+// Grant viewer permission
+$owner = User::find(1);
+$viewer = User::find(2);
+
+// Allow viewer to access owner's health data
+$owner->allowedViewers()->attach($viewer->id);
+
+// Check if viewer has access
+if ($viewer->canView($owner->id)) {
+    echo "Access granted";
+}
+
+// Get all users this viewer can access
+$accessibleUsers = $viewer->accessibleUsers;
+
+// Get all viewers for an owner
+$viewers = $owner->allowedViewers;
+
+// Revoke access
+$owner->allowedViewers()->detach($viewer->id);
+```
+
+### Checking Admin Status
+
+```php
+$user = auth()->user();
+
+if ($user->isAdmin()) {
+    // Admin-only operations
+    $allUsers = User::all();
+} else {
+    // Regular user operations
+    $ownData = $user->accessibleUsers;
+}
+```
+
+### Authentication Example
+
+```php
+// Login with username
+if (Auth::attempt(['username' => 'johnadmin', 'password' => 'password'])) {
+    $user = Auth::user();
+    echo "Welcome, {$user->name}";
+}
+
+// Login with email
+if (Auth::attempt(['email' => 'admin@example.com', 'password' => 'password'])) {
+    $user = Auth::user();
+    echo "Welcome, {$user->name}";
+}
+```
+
+## Traits Used
+
+- `HasFactory` - Enables model factories for testing and seeding
+- `Notifiable` - Adds notification functionality to users
+
+## Related Models
+
+- [MedicalAppointment](/api/models/medical-appointment)
+- [MeasurementWeight](/api/models/measurement-weight)
+- [MeasurementHeart](/api/models/measurement-heart)
+- [ActivityExercise](/api/models/activity-exercise)

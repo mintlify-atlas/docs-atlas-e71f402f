@@ -1,0 +1,355 @@
+---
+title: 'Medical Appointments'
+description: 'Schedule, track, and document your medical appointments with file attachments'
+---
+
+## Overview
+
+The Medical Appointments feature helps you manage all your healthcare visits in one place. Record upcoming appointments, document past visits, attach medical files, and keep a complete history of your medical consultations.
+
+<Note>
+  Appointments appear on your calendar with green badges and can include attached files like prescriptions, lab results, or medical reports.
+</Note>
+
+## Creating an Appointment
+
+### Quick Access Method
+
+The fastest way to log a new appointment:
+
+1. **Click the FAB** (Floating Action Button) in the bottom-right corner
+2. **Select "Nueva Cita"** (New Appointment) - the button with the green doctor icon
+3. **Fill out the appointment form**
+4. **Save** to add it to your calendar
+
+### Appointment Form Fields
+
+<CardGroup cols={2}>
+  <Card title="Title" icon="heading">
+    Brief description of the appointment (e.g., "Annual Physical", "Cardiology Follow-up")
+  </Card>
+  <Card title="Date & Time" icon="calendar-clock">
+    When the appointment is scheduled - supports both past and future dates
+  </Card>
+  <Card title="Description" icon="note-sticky">
+    Optional detailed notes about the appointment, symptoms, or discussion points (max 1000 characters)
+  </Card>
+  <Card title="File Attachments" icon="paperclip">
+    Upload medical documents, prescriptions, lab results, or images (max 10MB per file)
+  </Card>
+</CardGroup>
+
+### Validation Requirements
+
+```php
+[
+    'title' => 'required|string|max:255',
+    'date' => 'required|date',
+    'description' => 'nullable|string|max:1000',
+    'files.*' => 'nullable|file|max:10240', // 10MB
+]
+```
+
+<Tip>
+  Use descriptive titles to quickly identify appointments on your calendar. Include the doctor's specialty or the reason for the visit.
+</Tip>
+
+## Managing Attachments
+
+### Uploading Files
+
+The appointment system supports comprehensive file management:
+
+1. **During Creation**:
+   - Click "Choose Files" or drag files to the upload area
+   - Multiple files can be attached to a single appointment
+   - Preview file names before saving
+
+2. **Supported File Types**:
+   - Medical images (JPG, PNG, DICOM)
+   - PDF documents (lab results, prescriptions)
+   - Office documents (DOC, DOCX, XLS)
+   - Any file type up to 10MB per file
+
+3. **File Information Stored**:
+   ```php
+   [
+       'file_path' => 'attachments/appointments/[hash]',
+       'file_name' => 'original_filename.pdf',
+       'mime_type' => 'application/pdf',
+       'user_id' => auth()->id(),
+   ]
+   ```
+
+### Managing Existing Attachments
+
+When editing an appointment:
+
+- **View Existing Files**: All previously uploaded files are displayed
+- **Delete Attachments**: Remove files individually without deleting the appointment
+- **Add New Files**: Upload additional files to existing appointments
+- **Separate Management**: Files and appointment details can be updated independently
+
+<Note>
+  Deleted files are permanently removed from storage. The system automatically cleans up both the database record and the physical file.
+</Note>
+
+## Viewing Appointments
+
+### Calendar Integration
+
+Appointments integrate seamlessly with your calendar:
+
+- **Green Badge**: Appears on calendar days with scheduled appointments
+- **Click to View**: Select any day to see full appointment details
+- **Upcoming Indicator**: Dashboard shows your next appointment at the top
+
+### Day Details View
+
+When you click a calendar day with appointments:
+
+```php
+'appointments' => MedicalAppointment::with('attachments')
+    ->where('user_id', $userId)
+    ->whereBetween('date', $range)
+    ->latest('date')
+    ->get()
+```
+
+Displays:
+- Appointment title and time
+- Full description text
+- List of attached files with download links
+- Edit and delete options
+
+### Next Appointment Widget
+
+The calendar dashboard prominently displays:
+
+```php
+$nextAppointment = MedicalAppointment::where('user_id', $userId)
+    ->where('date', '>=', Carbon::now())
+    ->orderBy('date', 'asc')
+    ->first();
+```
+
+- Shows the nearest future appointment
+- Includes date and title
+- Helps you stay prepared
+- Updates automatically when appointments are added
+
+## Editing Appointments
+
+### How to Edit
+
+1. **Locate the Appointment**: Click the calendar day containing the appointment
+2. **Open Edit Modal**: Click the edit button in the day details view
+3. **Modify Details**: Update title, date, description, or attachments
+4. **Save Changes**: Appointment updates across all views
+
+### Edit Workflow
+
+The edit process uses event listeners:
+
+```php
+protected $listeners = ['edit-appointment' => 'loadAppointment'];
+
+public function loadAppointment($id)
+{
+    $appointment = MedicalAppointment::where('user_id', auth()->id())
+        ->findOrFail($id);
+    
+    $this->appointmentId = $appointment->id;
+    $this->title = $appointment->title;
+    $this->description = $appointment->description;
+    $this->date = Carbon::parse($appointment->date)->format('Y-m-d\TH:i');
+    $this->existingAttachments = $appointment->attachments;
+}
+```
+
+<Tip>
+  You can update appointment details without affecting existing attachments, or manage files separately from appointment information.
+</Tip>
+
+## Data Model Structure
+
+### MedicalAppointment Model
+
+```php
+protected $fillable = [
+    'user_id',
+    'title',
+    'date',
+    'description',
+    'file_path',
+];
+
+protected $casts = [
+    'date' => 'datetime',
+];
+```
+
+### Relationships
+
+The model defines two key relationships:
+
+1. **User Relationship**:
+   ```php
+   public function user(): BelongsTo
+   {
+       return $this->belongsTo(User::class);
+   }
+   ```
+
+2. **Polymorphic Attachments**:
+   ```php
+   public function attachments(): MorphMany
+   {
+       return $this->morphMany(Attachment::class, 'model');
+   }
+   ```
+
+<Note>
+  The polymorphic relationship allows the same attachment system to be used across different features (appointments, exercises, etc.).
+</Note>
+
+## File Storage
+
+### Storage Location
+
+Files are stored securely in the local storage:
+
+```php
+$path = $file->store('attachments/appointments', 'local');
+```
+
+- **Path**: `storage/app/attachments/appointments/`
+- **Naming**: Laravel generates unique hash-based filenames
+- **Security**: Files are stored outside the public web directory
+- **Access Control**: Only the owner and authorized viewers can download files
+
+### Deletion Process
+
+When deleting attachments:
+
+```php
+if (Storage::disk('local')->exists($attachment->file_path)) {
+    Storage::disk('local')->delete($attachment->file_path);
+}
+$attachment->delete();
+```
+
+1. Checks if physical file exists
+2. Deletes file from storage
+3. Removes database record
+4. Updates the attachment list
+
+## Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Pre-Appointment Planning" icon="clipboard-list">
+    Schedule upcoming appointments and attach notes about symptoms or questions to discuss with your doctor.
+  </Card>
+  <Card title="Medical Records" icon="file-medical">
+    Document past appointments with visit summaries and attach prescriptions or treatment plans.
+  </Card>
+  <Card title="Lab Results Tracking" icon="vial">
+    Store lab results and test reports attached to the appointment when they were ordered.
+  </Card>
+  <Card title="Prescription Management" icon="prescription">
+    Keep digital copies of prescriptions associated with the appointment where they were issued.
+  </Card>
+</CardGroup>
+
+## Real-time Updates
+
+After saving an appointment:
+
+```php
+$this->dispatch('close-modal', 'log-appointment');
+$this->dispatch('refresh-calendar');
+$this->dispatch('refresh-history');
+```
+
+This ensures:
+- Modal closes automatically
+- Calendar displays the green appointment badge
+- "Next Appointment" widget updates
+- History views refresh instantly
+- No page reload required
+
+## Data Sharing
+
+When you share your health data:
+
+- **Appointments Are Included**: Shared viewers see your appointment schedule
+- **Attachments Accessible**: Viewers can download attached medical files
+- **Read-Only Access**: Viewers cannot edit or delete your appointments
+- **Privacy Control**: Revoke access anytime to stop sharing
+
+<Tip>
+  Share your data with family members before medical appointments so they can stay informed and offer support.
+</Tip>
+
+## Viewer Mode Restrictions
+
+When viewing another user's shared calendar:
+
+- Cannot create new appointments
+- Cannot edit existing appointments
+- Cannot upload or delete attachments
+- Can view all appointment details and download files
+- Blue banner indicates "Modo Espectador" (Viewer Mode)
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Schedule in Advance" icon="calendar-plus">
+    Add appointments as soon as they're scheduled to avoid forgetting them.
+  </Card>
+  <Card title="Document Immediately" icon="pen-to-square">
+    After appointments, add notes and attachments while the visit is fresh in your mind.
+  </Card>
+  <Card title="Organize Files" icon="folder-tree">
+    Use clear file names before uploading to make documents easy to identify later.
+  </Card>
+  <Card title="Regular Reviews" icon="rotate">
+    Periodically review past appointments to track your health journey and prepare for follow-ups.
+  </Card>
+</CardGroup>
+
+## Technical Implementation
+
+### Livewire Component
+
+**Component**: `App\Livewire\Dashboard\AppointmentLog`
+
+**Traits Used**:
+- `WithFileUploads` - Enables file upload functionality
+
+**Key Features**:
+- Multi-file upload support
+- Real-time file preview
+- Separate management of new vs. existing attachments
+- Event-driven updates
+
+### Form State Management
+
+The component maintains separate arrays for file handling:
+
+```php
+public $files = [];        // New files to be uploaded
+public $uploads = [];      // Temporary upload storage
+public $existingAttachments = []; // Files already saved
+```
+
+This allows:
+- Adding new files to existing appointments
+- Removing files before they're saved
+- Deleting existing files without affecting new uploads
+
+## Related Features
+
+- [Interactive Calendar](/features/calendar) - View appointments in calendar context
+- [Health Tracking](/features/health-tracking) - Track measurements before/after appointments
+- [Data Sharing](/features/data-sharing) - Share appointment records with healthcare providers

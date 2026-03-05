@@ -1,0 +1,119 @@
+---
+title: "Introduction"
+description: "Welcome to Health Manager - Your personal health data management platform"
+---
+
+<img
+  className="block rounded-lg border border-[#e0e0e0]"
+  src="https://media.brand.dev/288cc7c4-5cef-4376-950b-bdf0083eedae.png"
+  alt="Health Manager Logo"
+  style={{ maxWidth: '200px', margin: '0 auto 2rem' }}
+/>
+
+## What is Health Manager?
+
+Health Manager is a self-hosted health management platform that allows you to track medical appointments, monitor weight measurements, record blood pressure and heart rate, log exercise activities, and securely share your health data with family members, doctors, or caregivers.
+
+Built with Laravel 12, Livewire 3, and Tailwind CSS, Health Manager provides a modern, responsive interface for managing your health information with complete control over your data.
+
+## Key Features
+
+<CardGroup cols={2}>
+  <Card title="Interactive Calendar" icon="calendar-days" href="/features/calendar">
+    Visual management of medical appointments and health events with an intuitive calendar interface
+  </Card>
+  <Card title="Health Tracking" icon="heart-pulse" href="/features/health-tracking">
+    Monitor weight, blood pressure, heart rate, and exercise activities with historical graphs
+  </Card>
+  <Card title="Medical Appointments" icon="user-doctor" href="/features/appointments">
+    Schedule and track medical appointments with detailed notes and attachments
+  </Card>
+  <Card title="Secure Data Sharing" icon="share-nodes" href="/features/data-sharing">
+    Share your health data with trusted users in read-only mode for collaborative care
+  </Card>
+</CardGroup>
+
+## Why Health Manager?
+
+<CardGroup cols={2}>
+  <Card title="Self-Hosted" icon="server">
+    Complete control over your health data with self-hosted deployment options
+  </Card>
+  <Card title="Privacy First" icon="shield-halved">
+    Your health information stays on your server with secure, encrypted storage
+  </Card>
+  <Card title="Easy Deployment" icon="rocket">
+    Zero-touch installation with automatic database setup and first-user admin creation
+  </Card>
+  <Card title="PDF Export" icon="file-pdf">
+    Export your complete health history to PDF for medical appointments or records
+  </Card>
+</CardGroup>
+
+## Quick Start
+
+Get started with Health Manager in minutes:
+
+<Steps>
+  <Step title="Installation">
+    Clone the repository and install dependencies
+    
+    ```bash
+    git clone https://github.com/formatocd/health-manager.git
+    cd health-manager
+    composer install --no-dev --optimize-autoloader
+    npm install && npm run build
+    ```
+  </Step>
+  
+  <Step title="Configuration">
+    Set up your environment configuration
+    
+    ```bash
+    cp .env.example .env
+    php artisan key:generate
+    ```
+  </Step>
+  
+  <Step title="First Login">
+    Access your application and register the first user (automatically becomes admin)
+  </Step>
+</Steps>
+
+## Deployment Options
+
+Health Manager supports multiple deployment methods:
+
+- **VPS/SSH Hosting**: Full control with command-line access
+- **Shared Hosting**: Deploy via FTP without terminal access
+- **Docker**: Containerized deployment with PostgreSQL
+
+Learn more in the [Deployment](/deployment/vps-setup) section.
+
+## Requirements
+
+- PHP 8.4 or higher
+- Composer and NPM
+- MySQL, MariaDB, PostgreSQL, or SQLite database
+- Web server (Apache, Nginx, or built-in PHP server)
+
+## Get Help
+
+<CardGroup cols={2}>
+  <Card title="User Guide" icon="book-open" href="/guides/first-login">
+    Learn how to use Health Manager's features
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/models/user">
+    Explore the technical documentation
+  </Card>
+  <Card title="GitHub Repository" icon="github" href="https://github.com/formatocd/health-manager">
+    View source code and report issues
+  </Card>
+  <Card title="Administration" icon="user-shield" href="/admin/user-management">
+    Manage users and permissions
+  </Card>
+</CardGroup>
+
+## License
+
+Health Manager is open source software licensed under the [MIT License](https://opensource.org/licenses/MIT).

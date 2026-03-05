@@ -1,0 +1,460 @@
+---
+title: Security Best Practices
+description: Essential security recommendations for deploying and maintaining Health Manager in production environments.
+---
+
+## Overview
+
+Health Manager handles sensitive health data and requires careful attention to security. This guide provides essential recommendations for securing your production deployment.
+
+<Warning>
+Health data is highly sensitive and may be subject to regulations like HIPAA (USA), GDPR (EU), or other data protection laws. Consult with legal and compliance experts before deploying to production.
+</Warning>
+
+## Authentication Security
+
+### Password Requirements
+
+The system generates 10-character passwords for new users:
+
+**Source:** `app/Livewire/Admin/UserManagement.php:29`
+
+```php
+$password = Str::password(10);
+```
+
+<Tip>
+Consider increasing the default password length to 16+ characters for enhanced security:
+
+```php
+$password = Str::password(16);
+```
+</Tip>
+
+### Password Policy Recommendations
+
+1. **Enforce strong passwords**: Require minimum length, complexity, and character variety
+2. **Password rotation**: Implement periodic password changes (e.g., every 90 days)
+3. **Password history**: Prevent reuse of recent passwords
+4. **Account lockout**: Lock accounts after multiple failed login attempts
+5. **Two-factor authentication**: Add 2FA for all admin accounts at minimum
+
+### Session Management
+
+```php
+// In config/session.php
+'lifetime' => 120, // Session timeout in minutes
+'expire_on_close' => true, // End session when browser closes
+'secure' => env('SESSION_SECURE_COOKIE', true), // HTTPS only
+'http_only' => true, // Prevent JavaScript access
+'same_site' => 'strict', // CSRF protection
+```
+
+<Note>
+Shorter session lifetimes improve security but may impact user experience. Balance security needs with usability.
+</Note>
+
+## Admin Role Security
+
+### First User Auto-Admin
+
+The first registered user automatically becomes an admin:
+
+**Source:** `app/Models/User.php:60-64`
+
+<Warning>
+In production, immediately secure your installation by:
+
+1. Creating the first admin account before making the system publicly accessible
+2. Using a strong, unique password
+3. Storing credentials in a secure password manager
+4. Never using default or predictable credentials
+</Warning>
+
+### Admin Account Best Practices
+
+1. **Limit admin accounts**: Only grant admin privileges to essential personnel
+2. **Use separate accounts**: Admins should have separate accounts for daily use vs. administrative tasks
+3. **Regular audits**: Review admin accounts quarterly and remove unnecessary access
+4. **Activity logging**: Implement comprehensive logging of all admin actions
+5. **Emergency access**: Maintain a secure process for emergency admin access
+
+### Admin Middleware Protection
+
+All admin routes are protected by middleware:
+
+**Source:** `app/Http/Middleware/EnsureUserIsAdmin.php:16-22`
+
+```php
+if (!auth()->check() || !auth()->user()->isAdmin()) {
+    abort(403, 'Access denied. Admins only.');
+}
+```
+
+<Tip>
+Consider adding IP whitelisting for admin routes in high-security environments:
+
+```php
+if (!in_array($request->ip(), config('admin.allowed_ips'))) {
+    abort(403, 'Access denied from this IP address.');
+}
+```
+</Tip>
+
+## Data Access Security
+
+### Permission Validation
+
+Always validate permissions before displaying user data:
+
+**Source:** `app/Models/User.php:77-81`
+
+```php
+if (!auth()->user()->canView($targetUserId)) {
+    abort(403, 'You do not have permission to view this data.');
+}
+```
+
+<Warning>
+Never bypass permission checks, even for admin users, without explicit authorization logic.
+</Warning>
+
+### Self-Deletion Prevention
+
+The system prevents admins from deleting their own accounts:
+
+**Source:** `app/Livewire/Admin/UserManagement.php:59`
+
+```php
+if ($id === auth()->id()) return;
+```
+
+This prevents accidental system lockout.
+
+### Cascade Deletion
+
+User deletion cascades to all related data:
+
+**Source:** `database/migrations/2026_01_23_193300_create_user_permissions_table.php:18-19`
+
+```php
+$table->foreignId('owner_id')->constrained('users')->onDelete('cascade');
+$table->foreignId('viewer_id')->constrained('users')->onDelete('cascade');
+```
+
+<Note>
+Consider implementing soft deletes instead of permanent deletion to maintain data integrity and support recovery:
+
+```php
+use Illuminate\Database\Eloquent\SoftDeletes;
+
+class User extends Authenticatable
+{
+    use SoftDeletes;
+}
+```
+</Note>
+
+## Invitation Link Security
+
+### Token Generation
+
+Invitation tokens are 40-character random strings:
+
+**Source:** `app/Livewire/Admin/UserManagement.php:74`
+
+```php
+$token = Str::random(40);
+```
+
+### Expiration and Single-Use
+
+<Accordion title="Invitation security features">
+- **Expiration**: Links expire after 24 hours
+- **Single use**: Token should be marked as used after registration
+- **Random tokens**: 40 characters provide strong protection against brute force
+
+**Recommendations:**
+
+1. Shorten expiration time for high-security environments (e.g., 4-8 hours)
+2. Add IP tracking to detect suspicious usage patterns
+3. Limit number of active invitations per admin
+4. Implement rate limiting on invitation generation
+</Accordion>
+
+### Invitation Best Practices
+
+```php
+// Shorter expiration for sensitive environments
+Invitation::create([
+    'token' => $token,
+    'role' => 'user',
+    'expires_at' => now()->addHours(4), // 4 hours instead of 24
+]);
+```
+
+## Email Security
+
+### Credential Transmission
+
+The system emails passwords to new users:
+
+**Source:** `app/Livewire/Admin/UserManagement.php:47-51`
+
+<Warning>
+Sending passwords via email is a security risk. Consider these alternatives:
+
+1. **Password reset links**: Send a one-time password reset link instead of the actual password
+2. **Temporary passwords**: Require password change on first login
+3. **Invitation links**: Use invitation links instead of direct account creation
+</Warning>
+
+### Secure Email Configuration
+
+```php
+// In .env
+MAIL_MAILER=smtp
+MAIL_HOST=smtp.example.com
+MAIL_PORT=587
+MAIL_USERNAME=your-username
+MAIL_PASSWORD=your-password
+MAIL_ENCRYPTION=tls // Use TLS encryption
+MAIL_FROM_ADDRESS=noreply@yourdomain.com
+MAIL_FROM_NAME="Health Manager"
+```
+
+<Tip>
+Use dedicated email service providers (SendGrid, Mailgun, Amazon SES) for better deliverability and security.
+</Tip>
+
+## Database Security
+
+### Connection Security
+
+```php
+// In .env
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=health_manager
+DB_USERNAME=secure_username
+DB_PASSWORD=strong_random_password
+```
+
+### Database Hardening
+
+1. **Use strong credentials**: Generate random, complex database passwords
+2. **Principle of least privilege**: Grant only necessary database permissions
+3. **Encryption at rest**: Enable database encryption for sensitive data
+4. **Regular backups**: Implement automated, encrypted backup solutions
+5. **Network isolation**: Restrict database access to application servers only
+
+### Password Hashing
+
+Passwords are automatically hashed using Laravel's default bcrypt:
+
+**Source:** `app/Models/User.php:47`
+
+```php
+'password' => 'hashed',
+```
+
+<Note>
+Laravel uses bcrypt with a cost factor of 10 by default. This provides strong protection against brute force attacks.
+</Note>
+
+## Environment Configuration
+
+### Production Environment Variables
+
+```bash
+# Application
+APP_ENV=production
+APP_DEBUG=false // Never enable debug in production
+APP_URL=https://yourdomain.com
+APP_KEY=base64:... // Generate with: php artisan key:generate
+
+# Security
+SESSION_SECURE_COOKIE=true
+SESSION_SAME_SITE=strict
+
+# Database
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1 // Use private IP or socket
+DB_PORT=3306
+DB_DATABASE=health_manager_prod
+DB_USERNAME=secure_db_user
+DB_PASSWORD=complex_random_password
+```
+
+<Warning>
+Never commit `.env` files to version control. Use secure secret management services like AWS Secrets Manager, HashiCorp Vault, or similar solutions.
+</Warning>
+
+## HTTPS and Transport Security
+
+### Force HTTPS
+
+```php
+// In app/Providers/AppServiceProvider.php
+use Illuminate\Support\Facades\URL;
+
+public function boot()
+{
+    if ($this->app->environment('production')) {
+        URL::forceScheme('https');
+    }
+}
+```
+
+### Security Headers
+
+Add security headers in `config/cors.php` or via middleware:
+
+```php
+// Security headers
+header('X-Frame-Options: DENY');
+header('X-Content-Type-Options: nosniff');
+header('X-XSS-Protection: 1; mode=block');
+header('Strict-Transport-Security: max-age=31536000; includeSubDomains');
+header('Referrer-Policy: strict-origin-when-cross-origin');
+```
+
+## Logging and Monitoring
+
+### Audit Logging
+
+Implement comprehensive audit logging:
+
+```php
+// Log all admin actions
+Log::channel('audit')->info('Admin action', [
+    'admin_id' => auth()->id(),
+    'action' => 'user_deleted',
+    'target_user_id' => $deletedUserId,
+    'ip_address' => request()->ip(),
+    'user_agent' => request()->userAgent(),
+    'timestamp' => now(),
+]);
+```
+
+### Security Monitoring
+
+<Accordion title="Events to monitor">
+- Failed login attempts
+- Admin account creation/deletion
+- User permission changes
+- Bulk data exports
+- Unusual access patterns
+- API rate limit violations
+- Invitation link generation
+- Password reset requests
+</Accordion>
+
+## Regulatory Compliance
+
+### HIPAA (Healthcare Insurance Portability and Accountability Act)
+
+If operating in the United States:
+
+1. **Encryption**: Encrypt data at rest and in transit
+2. **Access controls**: Implement role-based access control (RBAC)
+3. **Audit trails**: Maintain comprehensive logs of data access
+4. **Business Associate Agreements**: Ensure all vendors sign BAAs
+5. **Breach notification**: Have procedures for breach detection and notification
+
+### GDPR (General Data Protection Regulation)
+
+If serving EU citizens:
+
+1. **Data minimization**: Collect only necessary data
+2. **Right to erasure**: Implement user data deletion functionality
+3. **Data portability**: Allow users to export their data
+4. **Consent management**: Obtain explicit consent for data processing
+5. **Privacy by design**: Build privacy into all features
+
+<Warning>
+This guide provides general security recommendations but does not constitute legal or compliance advice. Consult qualified professionals for regulatory compliance.
+</Warning>
+
+## Backup and Disaster Recovery
+
+### Backup Strategy
+
+1. **Automated backups**: Daily automated database backups
+2. **Encrypted storage**: Encrypt all backup files
+3. **Off-site storage**: Store backups in separate geographic location
+4. **Retention policy**: Define backup retention periods (e.g., 30 days)
+5. **Regular testing**: Test backup restoration quarterly
+
+### Example Backup Command
+
+```bash
+# Daily backup script
+#!/bin/bash
+DATE=$(date +%Y%m%d_%H%M%S)
+BACKUP_DIR="/secure/backups"
+
+# Database backup
+mysqldump -u $DB_USER -p$DB_PASS $DB_NAME | \
+  openssl enc -aes-256-cbc -salt -out \
+  $BACKUP_DIR/db_backup_$DATE.sql.enc -k $ENCRYPTION_KEY
+
+# File storage backup
+tar czf - /path/to/storage | \
+  openssl enc -aes-256-cbc -salt -out \
+  $BACKUP_DIR/files_backup_$DATE.tar.gz.enc -k $ENCRYPTION_KEY
+```
+
+## Security Checklist
+
+Before deploying to production:
+
+- [ ] First admin account created with strong password
+- [ ] `APP_DEBUG=false` in production
+- [ ] HTTPS enforced with valid SSL certificate
+- [ ] Session cookies set to secure and httpOnly
+- [ ] Database credentials are strong and unique
+- [ ] `.env` file excluded from version control
+- [ ] Security headers configured
+- [ ] Rate limiting enabled on authentication endpoints
+- [ ] Audit logging implemented
+- [ ] Backup system configured and tested
+- [ ] Monitoring and alerting configured
+- [ ] Security scanning tools integrated
+- [ ] Dependency vulnerabilities checked
+- [ ] Legal compliance requirements reviewed
+- [ ] Incident response plan documented
+
+## Regular Security Maintenance
+
+### Weekly
+- Review audit logs for suspicious activity
+- Check failed login attempts
+- Monitor system resource usage
+
+### Monthly
+- Update dependencies and apply security patches
+- Review user permissions and remove unnecessary access
+- Test backup restoration
+- Review and rotate API keys if applicable
+
+### Quarterly
+- Conduct security audit
+- Review and update security policies
+- Test incident response procedures
+- User access review (especially admin accounts)
+
+### Annually
+- Comprehensive security assessment
+- Penetration testing
+- Compliance audit
+- Update disaster recovery plan
+
+## Additional Resources
+
+- [Laravel Security Best Practices](https://laravel.com/docs/security)
+- [OWASP Top 10](https://owasp.org/www-project-top-ten/)
+- [HIPAA Security Rule](https://www.hhs.gov/hipaa/for-professionals/security/index.html)
+- [GDPR Requirements](https://gdpr.eu/)
+- [CIS Benchmarks](https://www.cisecurity.org/cis-benchmarks/)

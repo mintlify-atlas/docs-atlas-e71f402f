@@ -1,0 +1,876 @@
+---
+title: Docker Deployment
+description: Deploy Health Manager using Docker and Docker Compose with production-ready configuration
+---
+
+Deploy Health Manager in a containerized environment using Docker. This method provides consistency across different platforms and simplifies deployment.
+
+## Prerequisites
+
+Install Docker and Docker Compose on your system:
+
+<CodeGroup>
+
+```bash Ubuntu/Debian
+# Install Docker
+curl -fsSL https://get.docker.com -o get-docker.sh
+sudo sh get-docker.sh
+
+# Install Docker Compose
+sudo apt-get update
+sudo apt-get install docker-compose-plugin
+
+# Add your user to docker group
+sudo usermod -aG docker $USER
+```
+
+```bash CentOS/RHEL
+# Install Docker
+sudo yum install -y yum-utils
+sudo yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+sudo yum install docker-ce docker-ce-cli containerd.io docker-compose-plugin
+
+# Start Docker
+sudo systemctl start docker
+sudo systemctl enable docker
+```
+
+```bash macOS
+# Download and install Docker Desktop
+# https://www.docker.com/products/docker-desktop
+
+# Or using Homebrew
+brew install --cask docker
+```
+
+```bash Windows
+# Download and install Docker Desktop
+# https://www.docker.com/products/docker-desktop
+
+# Requires WSL 2 backend
+```
+
+</CodeGroup>
+
+Verify installation:
+
+```bash
+docker --version
+docker compose version
+```
+
+## Understanding the Dockerfile
+
+Health Manager uses a **multi-stage build** for optimal production deployment:
+
+### Stage 1: Frontend Build
+
+```dockerfile
+FROM node:22-alpine AS frontend
+
+WORKDIR /app
+
+# Install dependencies
+COPY package.json package-lock.json* ./
+RUN npm ci
+
+# Build production assets
+COPY . .
+RUN npm run build
+```
+
+This stage compiles all frontend assets (CSS, JavaScript) using Vite.
+
+### Stage 2: Production Runtime
+
+```dockerfile
+FROM php:8.4-fpm
+
+WORKDIR /var/www/html
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    nginx \
+    supervisor \
+    libpq-dev \
+    libzip-dev \
+    # ... more dependencies
+```
+
+The production image includes:
+- **PHP 8.4 FPM** for processing PHP code
+- **Nginx** as the web server
+- **Supervisor** for process management
+- **PostgreSQL support** (default database)
+- **OPcache** for PHP optimization
+
+## Quick Start with Docker
+
+### Clone and Build
+
+```bash
+git clone https://github.com/formatocd/health-manager.git
+cd health-manager
+```
+
+### Build the Docker Image
+
+```bash
+docker build -t health-manager:latest .
+```
+
+This builds the image with all dependencies included. Build time: ~5-10 minutes.
+
+### Run the Container
+
+For a quick test with SQLite:
+
+```bash
+docker run -d \
+  --name health-manager \
+  -p 8080:80 \
+  -e DB_CONNECTION=sqlite \
+  health-manager:latest
+```
+
+Access the application at `http://localhost:8080`
+
+<Warning>
+This basic setup uses ephemeral storage. Data will be lost when the container is removed. Use Docker Compose for production.
+</Warning>
+
+## Production Deployment with Docker Compose
+
+For production deployments, use Docker Compose to orchestrate multiple containers.
+
+### Create Docker Compose Configuration
+
+Create `docker-compose.yml` in your project root:
+
+```yaml docker-compose.yml
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: health-manager-app
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    environment:
+      # Application
+      APP_NAME: "Health Manager"
+      APP_ENV: production
+      APP_DEBUG: "false"
+      APP_URL: "http://localhost:8080"
+      APP_LOCALE: en
+      
+      # Database - PostgreSQL
+      DB_CONNECTION: pgsql
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_DATABASE: health_manager
+      DB_USERNAME: healthuser
+      DB_PASSWORD: secure_password_change_this
+      
+      # Mail Configuration
+      MAIL_MAILER: smtp
+      MAIL_HOST: smtp.gmail.com
+      MAIL_PORT: 587
+      MAIL_USERNAME: your-email@gmail.com
+      MAIL_PASSWORD: your-app-password
+      MAIL_ENCRYPTION: tls
+      MAIL_FROM_ADDRESS: "noreply@yourdomain.com"
+      MAIL_FROM_NAME: "Health Manager"
+    volumes:
+      - app-storage:/var/www/html/storage/app
+      - app-logs:/var/www/html/storage/logs
+    depends_on:
+      - db
+    networks:
+      - health-manager-network
+
+  db:
+    image: postgres:16-alpine
+    container_name: health-manager-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: health_manager
+      POSTGRES_USER: healthuser
+      POSTGRES_PASSWORD: secure_password_change_this
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    networks:
+      - health-manager-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U healthuser"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  db-data:
+    driver: local
+  app-storage:
+    driver: local
+  app-logs:
+    driver: local
+
+networks:
+  health-manager-network:
+    driver: bridge
+```
+
+<Warning>
+**Security:** Change the default passwords before deploying to production!
+</Warning>
+
+### Alternative: MySQL Configuration
+
+To use MySQL instead of PostgreSQL:
+
+<CodeGroup>
+
+```yaml MySQL Service
+db:
+  image: mysql:8.0
+  container_name: health-manager-db
+  restart: unless-stopped
+  environment:
+    MYSQL_DATABASE: health_manager
+    MYSQL_USER: healthuser
+    MYSQL_PASSWORD: secure_password_change_this
+    MYSQL_ROOT_PASSWORD: root_password_change_this
+  volumes:
+    - db-data:/var/lib/mysql
+  networks:
+    - health-manager-network
+  command: --default-authentication-plugin=mysql_native_password
+  healthcheck:
+    test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+    interval: 10s
+    timeout: 5s
+    retries: 5
+```
+
+```yaml App Environment (MySQL)
+app:
+  environment:
+    DB_CONNECTION: mysql
+    DB_HOST: db
+    DB_PORT: 3306
+    DB_DATABASE: health_manager
+    DB_USERNAME: healthuser
+    DB_PASSWORD: secure_password_change_this
+```
+
+</CodeGroup>
+
+### Deploy with Docker Compose
+
+<Steps>
+
+### Start the Services
+
+```bash
+docker compose up -d
+```
+
+This command:
+- Builds the application image (if not already built)
+- Starts the database container
+- Starts the application container
+- Creates necessary volumes and networks
+
+### Check Status
+
+Verify all containers are running:
+
+```bash
+docker compose ps
+```
+
+Expected output:
+```
+NAME                   STATUS              PORTS
+health-manager-app     Up 2 minutes        0.0.0.0:8080->80/tcp
+health-manager-db      Up 2 minutes        5432/tcp
+```
+
+### View Logs
+
+Monitor application logs:
+
+```bash
+# All services
+docker compose logs -f
+
+# Application only
+docker compose logs -f app
+
+# Database only
+docker compose logs -f db
+```
+
+### Access the Application
+
+Open your browser and navigate to:
+
+```
+http://localhost:8080
+```
+
+</Steps>
+
+## Environment Configuration
+
+### Using .env File
+
+Instead of defining environment variables in `docker-compose.yml`, use a `.env` file:
+
+```bash .env
+# Application
+APP_NAME="Health Manager"
+APP_ENV=production
+APP_DEBUG=false
+APP_URL=https://yourdomain.com
+APP_KEY=  # Will be auto-generated on first run
+
+# Database
+DB_CONNECTION=pgsql
+DB_HOST=db
+DB_PORT=5432
+DB_DATABASE=health_manager
+DB_USERNAME=healthuser
+DB_PASSWORD=your_secure_password_here
+
+# Mail
+MAIL_MAILER=smtp
+MAIL_HOST=smtp.yourserver.com
+MAIL_PORT=587
+MAIL_USERNAME=your_email@domain.com
+MAIL_PASSWORD=your_email_password
+MAIL_ENCRYPTION=tls
+MAIL_FROM_ADDRESS="noreply@yourdomain.com"
+MAIL_FROM_NAME="${APP_NAME}"
+```
+
+Update `docker-compose.yml` to use the env file:
+
+```yaml docker-compose.yml
+services:
+  app:
+    env_file:
+      - .env
+    # ... rest of configuration
+```
+
+## Container Management
+
+### Start Containers
+
+```bash
+docker compose start
+```
+
+### Stop Containers
+
+```bash
+docker compose stop
+```
+
+### Restart Containers
+
+```bash
+docker compose restart
+```
+
+### Stop and Remove Containers
+
+```bash
+docker compose down
+```
+
+<Warning>
+Using `docker compose down -v` will also delete volumes, **removing all data**. Use with caution!
+</Warning>
+
+### Rebuild After Changes
+
+After modifying the Dockerfile or code:
+
+```bash
+docker compose up -d --build
+```
+
+## Running Commands Inside Containers
+
+### Execute Artisan Commands
+
+```bash
+# Clear cache
+docker compose exec app php artisan cache:clear
+
+# Run migrations manually (not usually needed)
+docker compose exec app php artisan migrate
+
+# Create a user
+docker compose exec app php artisan tinker
+```
+
+### Access Container Shell
+
+```bash
+docker compose exec app bash
+```
+
+### Database Access
+
+<CodeGroup>
+
+```bash PostgreSQL
+# Access PostgreSQL CLI
+docker compose exec db psql -U healthuser -d health_manager
+
+# Backup database
+docker compose exec db pg_dump -U healthuser health_manager > backup.sql
+
+# Restore database
+docker compose exec -T db psql -U healthuser health_manager < backup.sql
+```
+
+```bash MySQL
+# Access MySQL CLI
+docker compose exec db mysql -u healthuser -p health_manager
+
+# Backup database
+docker compose exec db mysqldump -u healthuser -p health_manager > backup.sql
+
+# Restore database
+docker compose exec -T db mysql -u healthuser -p health_manager < backup.sql
+```
+
+</CodeGroup>
+
+## SSL/HTTPS Configuration
+
+### Option 1: Reverse Proxy (Recommended)
+
+Use Nginx or Traefik as a reverse proxy with automatic SSL:
+
+<CodeGroup>
+
+```yaml Nginx Proxy with Let's Encrypt
+services:
+  nginx-proxy:
+    image: nginxproxy/nginx-proxy
+    container_name: nginx-proxy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+      - nginx-certs:/etc/nginx/certs
+      - nginx-vhost:/etc/nginx/vhost.d
+      - nginx-html:/usr/share/nginx/html
+    networks:
+      - health-manager-network
+
+  letsencrypt:
+    image: nginxproxy/acme-companion
+    container_name: nginx-proxy-acme
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - nginx-certs:/etc/nginx/certs
+      - nginx-vhost:/etc/nginx/vhost.d
+      - nginx-html:/usr/share/nginx/html
+    environment:
+      - DEFAULT_EMAIL=admin@yourdomain.com
+    depends_on:
+      - nginx-proxy
+    networks:
+      - health-manager-network
+
+  app:
+    environment:
+      - VIRTUAL_HOST=yourdomain.com
+      - LETSENCRYPT_HOST=yourdomain.com
+      - LETSENCRYPT_EMAIL=admin@yourdomain.com
+    # Remove ports since nginx-proxy handles them
+```
+
+```yaml Traefik with Let's Encrypt
+services:
+  traefik:
+    image: traefik:v2.10
+    container_name: traefik
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.letsencrypt.acme.email=admin@yourdomain.com"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8081:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - traefik-certs:/letsencrypt
+    networks:
+      - health-manager-network
+
+  app:
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.app.rule=Host(`yourdomain.com`)"
+      - "traefik.http.routers.app.entrypoints=websecure"
+      - "traefik.http.routers.app.tls.certresolver=letsencrypt"
+```
+
+</CodeGroup>
+
+### Option 2: Mount SSL Certificates
+
+If you have existing SSL certificates:
+
+```yaml docker-compose.yml
+services:
+  app:
+    volumes:
+      - ./certs:/etc/nginx/certs:ro
+      - ./nginx-ssl.conf:/etc/nginx/conf.d/default.conf:ro
+```
+
+## Data Persistence & Backups
+
+### Volume Locations
+
+Docker volumes store persistent data:
+
+```bash
+# List volumes
+docker volume ls
+
+# Inspect volume
+docker volume inspect health-manager_db-data
+
+# Locate volume on filesystem
+docker volume inspect health-manager_db-data | grep Mountpoint
+```
+
+### Backup Strategy
+
+<Accordion title="Automated Backup Script">
+
+Create `backup.sh`:
+
+```bash backup.sh
+#!/bin/bash
+
+BACKUP_DIR="./backups/$(date +%Y%m%d_%H%M%S)"
+mkdir -p "$BACKUP_DIR"
+
+echo "Creating backup..."
+
+# Backup database
+docker compose exec -T db pg_dump -U healthuser health_manager > "$BACKUP_DIR/database.sql"
+
+# Backup uploaded files
+docker compose exec -T app tar czf - -C /var/www/html/storage/app . > "$BACKUP_DIR/storage.tar.gz"
+
+# Backup .env file
+cp .env "$BACKUP_DIR/.env"
+
+echo "Backup completed: $BACKUP_DIR"
+
+# Keep only last 7 days of backups
+find ./backups -type d -mtime +7 -exec rm -rf {} +
+```
+
+Make executable and run:
+
+```bash
+chmod +x backup.sh
+./backup.sh
+```
+
+Schedule with cron:
+
+```bash
+# Daily backup at 2 AM
+0 2 * * * cd /path/to/health-manager && ./backup.sh
+```
+
+</Accordion>
+
+### Restore from Backup
+
+```bash
+# Stop containers
+docker compose down
+
+# Restore database
+docker compose up -d db
+docker compose exec -T db psql -U healthuser health_manager < backups/20240101/database.sql
+
+# Restore storage
+docker compose exec -T app tar xzf - -C /var/www/html/storage/app < backups/20240101/storage.tar.gz
+
+# Start all services
+docker compose up -d
+```
+
+## Performance Optimization
+
+### Adjust PHP-FPM Workers
+
+Create custom PHP-FPM configuration:
+
+```ini docker/php-fpm.conf
+[www]
+pm = dynamic
+pm.max_children = 50
+pm.start_servers = 10
+pm.min_spare_servers = 5
+pm.max_spare_servers = 20
+pm.max_requests = 500
+```
+
+Mount in docker-compose.yml:
+
+```yaml
+services:
+  app:
+    volumes:
+      - ./docker/php-fpm.conf:/usr/local/etc/php-fpm.d/www.conf:ro
+```
+
+### Resource Limits
+
+Limit container resource usage:
+
+```yaml docker-compose.yml
+services:
+  app:
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '1'
+          memory: 1G
+```
+
+## Monitoring & Logs
+
+### View Real-time Logs
+
+```bash
+# All services
+docker compose logs -f
+
+# Specific service with timestamps
+docker compose logs -f --timestamps app
+
+# Last 100 lines
+docker compose logs --tail=100 app
+```
+
+### Container Stats
+
+```bash
+docker stats
+```
+
+Shows CPU, memory, network, and disk usage for all running containers.
+
+### Health Checks
+
+Add health check to application:
+
+```yaml docker-compose.yml
+services:
+  app:
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+```
+
+## Troubleshooting
+
+<Accordion title="Container Won't Start">
+
+1. **Check logs:**
+   ```bash
+   docker compose logs app
+   ```
+
+2. **Verify environment variables:**
+   ```bash
+   docker compose config
+   ```
+
+3. **Check port conflicts:**
+   ```bash
+   sudo lsof -i :8080
+   ```
+
+4. **Restart services:**
+   ```bash
+   docker compose restart
+   ```
+
+</Accordion>
+
+<Accordion title="Database Connection Failed">
+
+1. **Verify database is running:**
+   ```bash
+   docker compose ps db
+   ```
+
+2. **Check database logs:**
+   ```bash
+   docker compose logs db
+   ```
+
+3. **Test database connection:**
+   ```bash
+   docker compose exec app php artisan tinker
+   >>> DB::connection()->getPdo();
+   ```
+
+4. **Verify credentials match** between `.env` and database service
+
+</Accordion>
+
+<Accordion title="Permission Errors">
+
+1. **Fix storage permissions:**
+   ```bash
+   docker compose exec app chown -R www-data:www-data /var/www/html/storage
+   docker compose exec app chmod -R 775 /var/www/html/storage
+   ```
+
+2. **Rebuild container:**
+   ```bash
+   docker compose down
+   docker compose up -d --build
+   ```
+
+</Accordion>
+
+<Accordion title="Out of Memory">
+
+1. **Check container memory usage:**
+   ```bash
+   docker stats
+   ```
+
+2. **Increase memory limit** in docker-compose.yml
+
+3. **Reduce PHP-FPM workers** in configuration
+
+4. **Check for memory leaks** in application logs
+
+</Accordion>
+
+<Accordion title="Slow Performance">
+
+1. **Enable OPcache:** Already enabled in Dockerfile
+
+2. **Cache Laravel config:**
+   ```bash
+   docker compose exec app php artisan config:cache
+   docker compose exec app php artisan route:cache
+   docker compose exec app php artisan view:cache
+   ```
+
+3. **Optimize Composer autoloader:**
+   ```bash
+   docker compose exec app composer dump-autoload --optimize
+   ```
+
+4. **Check database performance:**
+   ```bash
+   docker compose exec db pg_stat_activity  # PostgreSQL
+   ```
+
+</Accordion>
+
+## Updates & Maintenance
+
+### Update Application
+
+```bash
+# Pull latest code
+git pull origin main
+
+# Rebuild and restart
+docker compose up -d --build
+
+# Clear cache
+docker compose exec app php artisan config:cache
+docker compose exec app php artisan route:cache
+docker compose exec app php artisan view:cache
+```
+
+### Update Docker Images
+
+```bash
+# Pull latest base images
+docker compose pull
+
+# Rebuild application
+docker compose up -d --build
+```
+
+### Clean Up
+
+Remove unused Docker resources:
+
+```bash
+# Remove unused images
+docker image prune -a
+
+# Remove unused volumes (BE CAREFUL!)
+docker volume prune
+
+# Remove everything unused
+docker system prune -a --volumes
+```
+
+<Warning>
+**Danger:** `docker system prune` with `--volumes` will delete all unused volumes, potentially losing data!
+</Warning>
+
+## Production Best Practices
+
+1. **Use specific image tags** instead of `latest`
+2. **Set resource limits** for containers
+3. **Implement health checks** for all services
+4. **Use secrets management** for sensitive data (Docker Secrets, Vault)
+5. **Enable log rotation** to prevent disk space issues
+6. **Monitor containers** with tools like Prometheus, Grafana
+7. **Regular backups** of database and uploaded files
+8. **Use Docker Swarm or Kubernetes** for high availability
+9. **Implement CI/CD** for automated deployments
+10. **Security scanning** of images with tools like Trivy
+
+## Next Steps
+
+- Set up reverse proxy with SSL
+- Configure automated backups
+- Implement monitoring and alerting
+- Set up log aggregation (ELK stack, Loki)
+- Configure auto-scaling (Kubernetes)
+- Implement CI/CD pipeline

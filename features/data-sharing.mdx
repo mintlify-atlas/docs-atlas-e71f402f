@@ -1,0 +1,361 @@
+---
+title: 'Data Sharing'
+description: 'Securely share your health data with family members, caregivers, or healthcare providers'
+---
+
+## Overview
+
+The Data Sharing feature allows you to grant read-only access to your health information to trusted individuals. Share your complete health tracking history including weight measurements, blood pressure readings, exercise logs, and medical appointments with anyone who has a Health Manager account.
+
+<Note>
+  You maintain complete control over who can view your data and can revoke access at any time. Shared viewers have read-only access and cannot edit or delete your information.
+</Note>
+
+## How Data Sharing Works
+
+### Sharing Model
+
+Health Manager uses a viewer-based sharing system:
+
+- **Owner**: You (the person creating health records)
+- **Viewers**: People you grant access to (family, doctors, caregivers)
+- **Permissions**: Viewers have read-only access to all your health data
+- **Scope**: When you share, viewers see your complete health history
+
+### What Gets Shared
+
+When you grant access to a viewer, they can see:
+
+<CardGroup cols={2}>
+  <Card title="Calendar View" icon="calendar">
+    Your complete calendar with all activity indicators and the ability to view day details.
+  </Card>
+  <Card title="Weight Measurements" icon="weight-scale">
+    All historical weight entries with dates, values, and trends over time.
+  </Card>
+  <Card title="Blood Pressure" icon="heart-pulse">
+    Complete cardiovascular readings including systolic, diastolic, and heart rate measurements.
+  </Card>
+  <Card title="Medical Appointments" icon="user-doctor">
+    Scheduled and past appointments with descriptions and the ability to download attached files.
+  </Card>
+</CardGroup>
+
+## Granting Access
+
+### Adding a Viewer
+
+1. **Navigate to Profile Settings**: Access your account settings
+2. **Find Data Sharing Section**: Locate the "Share Data" or "Compartir Datos" section
+3. **Search for User**: Type the username of the person you want to grant access to
+4. **Select from Results**: Click on the correct user from the search results
+5. **Confirm**: Add the viewer to your authorized list
+
+<Tip>
+  Start typing after the second character - the search will automatically show matching usernames from the Health Manager user base.
+</Tip>
+
+### Search Functionality
+
+The username search is dynamic and user-friendly:
+
+```php
+public function updatedSearch()
+{
+    if (strlen($this->search) < 2) {
+        $this->searchResults = [];
+        return;
+    }
+
+    $this->searchResults = User::where('id', '!=', auth()->id())
+        ->where('username', 'like', '%' . $this->search . '%')
+        ->take(5)
+        ->get();
+}
+```
+
+**Features**:
+- Activates after typing 2 characters
+- Shows up to 5 matching usernames
+- Excludes yourself from results
+- Clears automatically when you select a user
+
+### Validation and Safeguards
+
+The system prevents common mistakes:
+
+1. **User Must Exist**:
+   ```php
+   'username' => 'required|exists:users,username'
+   ```
+   Error: "No encontramos ningún usuario con ese Nick."
+
+2. **Cannot Share with Yourself**:
+   ```php
+   if ($viewer->id === auth()->id()) {
+       throw ValidationException::withMessages([
+           'username' => 'No puedes compartirte datos a ti mismo.'
+       ]);
+   }
+   ```
+
+3. **No Duplicate Access**:
+   ```php
+   if (auth()->user()->allowedViewers()
+       ->where('viewer_id', $viewer->id)->exists()) {
+       throw ValidationException::withMessages([
+           'username' => 'Este usuario ya tiene acceso a tus datos.'
+       ]);
+   }
+   ```
+
+## Managing Viewers
+
+### Viewing Your Authorized List
+
+The data sharing interface displays:
+
+```php
+return view('livewire.profile.share-data', [
+    'viewers' => auth()->user()->allowedViewers
+]);
+```
+
+- Complete list of users with access to your data
+- Usernames or display names
+- Option to remove access for each viewer
+
+### Revoking Access
+
+Remove a viewer's access instantly:
+
+```php
+public function removeViewer($id)
+{
+    auth()->user()->allowedViewers()->detach($id);
+}
+```
+
+1. **Click Remove**: Select the remove button next to the viewer's name
+2. **Instant Revocation**: Access is removed immediately
+3. **No Confirmation Needed**: The viewer can no longer see your data
+4. **Seamless Process**: The viewer is not notified of the revocation
+
+<Note>
+  Revoked viewers immediately lose access to your health data. They can be re-added later if needed.
+</Note>
+
+## Viewer Experience
+
+### Accessing Shared Data
+
+When someone shares their data with you:
+
+1. You can view their calendar from your account
+2. All their health activities are visible
+3. You see the same calendar interface they see
+4. Full historical data is available
+
+### Viewer Mode Indicators
+
+When viewing another user's data, the interface clearly indicates viewer mode:
+
+```php
+$isReadOnly = session('viewing_user_id') 
+    && session('viewing_user_id') != auth()->id();
+```
+
+**Visual Indicators**:
+- Blue banner at the top: "Modo Espectador" (Viewer Mode)
+- Message: "Estás viendo los datos de otro usuario. No puedes crear ni editar registros."
+- FAB (Floating Action Button) is hidden
+- No edit or delete buttons on entries
+
+### What Viewers Can Do
+
+✅ **Allowed Actions**:
+- View complete calendar with all activities
+- Navigate between months
+- Click days to see detailed entries
+- Download appointment attachments
+- See weight trends and statistics
+- Review blood pressure history
+- View upcoming and past appointments
+
+❌ **Restricted Actions**:
+- Cannot create new entries
+- Cannot edit existing data
+- Cannot delete records
+- Cannot upload files
+- Cannot modify appointments
+
+<Tip>
+  Viewer mode is perfect for healthcare providers who need to monitor your progress without risking accidental changes to your records.
+</Tip>
+
+## Data Sharing Relationships
+
+### Database Structure
+
+The sharing system uses a many-to-many relationship:
+
+```php
+// User model
+public function allowedViewers()
+{
+    return $this->belongsToMany(User::class, 
+        'user_viewer',
+        'user_id',
+        'viewer_id'
+    );
+}
+```
+
+**Pivot Table**: `user_viewer`
+- `user_id` - The person sharing their data
+- `viewer_id` - The person who can view the data
+- Supports many-to-many relationships
+- You can have multiple viewers
+- You can view multiple people's data
+
+### Session Management
+
+When viewing shared data:
+
+```php
+$userId = session('viewing_user_id', auth()->id());
+```
+
+- Session stores whose data you're currently viewing
+- Defaults to your own user ID
+- All queries filter by this context-aware user ID
+- Ensures data isolation and security
+
+## Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Family Caregiving" icon="house-medical">
+    Share your data with family members who help manage your health, medications, or attend appointments with you.
+  </Card>
+  <Card title="Remote Monitoring" icon="stethoscope">
+    Allow healthcare providers to monitor your vital signs and activity levels between appointments.
+  </Card>
+  <Card title="Health Accountability" icon="users">
+    Share with a workout buddy or accountability partner to stay motivated with fitness goals.
+  </Card>
+  <Card title="Emergency Access" icon="truck-medical">
+    Grant access to emergency contacts who may need your medical history in urgent situations.
+  </Card>
+</CardGroup>
+
+## Privacy and Security
+
+### Data Protection
+
+<CardGroup cols={2}>
+  <Card title="Explicit Consent" icon="shield-check">
+    No one can view your data unless you explicitly grant them access by username.
+  </Card>
+  <Card title="Read-Only Access" icon="eye">
+    Viewers cannot modify, delete, or corrupt your health records in any way.
+  </Card>
+  <Card title="Instant Revocation" icon="ban">
+    Remove access at any moment without warning or notification to the viewer.
+  </Card>
+  <Card title="User Control" icon="sliders">
+    You maintain complete control over who sees your data and for how long.
+  </Card>
+</CardGroup>
+
+### Security Measures
+
+The system implements multiple security layers:
+
+1. **Authentication Required**: Both parties must have Health Manager accounts
+2. **Query Filtering**: All data queries respect the user context
+   ```php
+   $userId = $this->getTargetUserId();
+   MeasurementWeight::where('user_id', $userId)->get();
+   ```
+3. **Write Protection**: Viewers cannot modify data at the controller level
+4. **Session Isolation**: Each session tracks the current viewing context
+5. **No Cross-Contamination**: Impossible to accidentally write to another user's records
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Trust-Based Sharing" icon="handshake">
+    Only share your health data with people you trust completely, as they'll have access to sensitive medical information.
+  </Card>
+  <Card title="Regular Audits" icon="list-check">
+    Periodically review your authorized viewers list and remove access for people who no longer need it.
+  </Card>
+  <Card title="Clear Communication" icon="comments">
+    Inform viewers when you grant them access so they know how to find your shared data.
+  </Card>
+  <Card title="Specific Purpose" icon="bullseye">
+    Consider granting temporary access for specific events (surgery recovery, treatment period) and revoking after.
+  </Card>
+</CardGroup>
+
+## Technical Implementation
+
+### ShareData Livewire Component
+
+**Component**: `App\Livewire\Profile\ShareData`
+
+**Public Properties**:
+```php
+public $username = '';      // Selected username to add
+public $search = '';        // Search query
+public $searchResults = []; // Dynamic search results
+```
+
+**Key Methods**:
+- `updatedSearch()` - Reactive search triggered on input
+- `selectUser($username)` - Handles user selection from results
+- `addViewer()` - Validates and grants access
+- `removeViewer($id)` - Revokes access
+- `render()` - Displays viewers list
+
+### Context-Aware Queries
+
+The `HasContext` trait provides user context:
+
+```php
+use HasContext;
+
+$userId = $this->getTargetUserId();
+// Returns viewing_user_id from session or auth()->id()
+```
+
+All components using this trait automatically respect shared data context:
+- Calendar
+- Weight history
+- Blood pressure logs
+- Appointment lists
+
+## Troubleshooting
+
+### Common Issues
+
+**"No encontramos ningún usuario con ese Nick"**
+- The username doesn't exist in the system
+- Check for typos in the username
+- Ensure the person has created a Health Manager account
+
+**"Este usuario ya tiene acceso a tus datos"**
+- You've already granted access to this person
+- Check your authorized viewers list
+- No need to add them again
+
+**Viewer Can't See My Data**
+- Verify the viewer is in your authorized list
+- Ensure they're looking at your shared data (not their own)
+- Check that they're using the correct account
+
+## Related Features
+
+- [Interactive Calendar](/features/calendar) - Main interface viewers use to see shared data
+- [Health Tracking](/features/health-tracking) - Metrics that can be shared with viewers
+- [Medical Appointments](/features/appointments) - Appointments visible to authorized viewers

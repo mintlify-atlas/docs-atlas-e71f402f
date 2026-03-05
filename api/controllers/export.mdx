@@ -1,0 +1,100 @@
+---
+title: ExportController
+description: Controller for exporting health history data as PDF reports
+---
+
+## Overview
+
+The `ExportController` handles the export of user health data into downloadable PDF reports.
+
+**Namespace:** `App\Http\Controllers`
+
+**Class:** `ExportController`
+
+## Methods
+
+### downloadHistory()
+
+Generates and downloads a comprehensive health history PDF report for the authenticated user.
+
+**Route:** `GET /export/history`
+
+**Route Name:** `export.history`
+
+**Middleware:** `auth`, `verified`
+
+**Authentication:** Required
+
+#### Description
+
+This method retrieves all health records for the authenticated user including:
+- Medical appointments
+- Exercise activities
+- Weight measurements
+- Heart rate measurements
+
+The records are sorted by date in descending order and compiled into a PDF report.
+
+#### Request Parameters
+
+No parameters required. Uses authenticated user's ID automatically.
+
+#### Response
+
+**Type:** PDF file download
+
+**Filename format:** `historial-salud-YYYY-MM-DD.pdf`
+
+**Content-Type:** `application/pdf`
+
+#### Code Example
+
+```php
+public function downloadHistory()
+{
+    $userId = auth()->id();
+
+    $appointments = MedicalAppointment::where('user_id', $userId)->get();
+    $exercises = ActivityExercise::where('user_id', $userId)->get();
+    $weights = MeasurementWeight::where('user_id', $userId)->get();
+    $hearts = MeasurementHeart::where('user_id', $userId)->get();
+
+    $records = $appointments->concat($exercises)
+                            ->concat($weights)
+                            ->concat($hearts)
+                            ->sortByDesc('date');
+
+    $pdf = Pdf::loadView('pdf.history-report', [
+        'records' => $records,
+        'user' => auth()->user(),
+        'date' => now()->format('d/m/Y')
+    ]);
+
+    return $pdf->download('historial-salud-' . now()->format('Y-m-d') . '.pdf');
+}
+```
+
+#### HTTP Request Example
+
+```bash
+curl -X GET https://your-domain.com/export/history \
+  -H "Accept: application/pdf" \
+  -H "Cookie: your_session_cookie" \
+  --output health-history.pdf
+```
+
+#### Usage in Blade
+
+```php
+<a href="{{ route('export.history') }}" class="btn btn-primary">
+    Download Health History
+</a>
+```
+
+## Dependencies
+
+- `Barryvdh\DomPDF\Facade\Pdf` - PDF generation
+- `App\Models\MedicalAppointment`
+- `App\Models\ActivityExercise`
+- `App\Models\MeasurementWeight`
+- `App\Models\MeasurementHeart`

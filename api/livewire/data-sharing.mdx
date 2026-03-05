@@ -1,0 +1,351 @@
+---
+title: ShareData Component
+description: Data sharing component for granting and managing viewer access to health data
+---
+
+## Overview
+
+The ShareData component allows users to share their health data with other users by granting viewer access. It provides username search functionality, viewer management, and validation to ensure proper access control.
+
+## Class Information
+
+**Namespace:** `App\Livewire\Profile`
+
+**Class:** `ShareData`
+
+## Public Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `username` | `string` | Username of the user to grant access to |
+| `search` | `string` | Search query for finding users |
+| `searchResults` | `array` | Collection of users matching the search query |
+
+## Methods
+
+### updatedSearch()
+
+Automatically triggered when the search property is updated. Performs a live search for users.
+
+```php
+public function updatedSearch()
+{
+    if (strlen($this->search) < 2) {
+        $this->searchResults = [];
+        return;
+    }
+
+    $this->searchResults = User::where('id', '!=', auth()->id())
+        ->where('username', 'like', '%' . $this->search . '%')
+        ->take(5)
+        ->get();
+}
+```
+
+**Behavior:**
+- Requires minimum 2 characters to start searching
+- Excludes the current authenticated user from results
+- Returns maximum 5 matching users
+- Uses LIKE query for partial matching
+
+**Usage:**
+```php
+<input type="text" wire:model.live="search" placeholder="Search users..." />
+```
+
+### selectUser($username)
+
+Selects a user from the search results and populates the username field.
+
+**Parameters:**
+- `$username` (string) - Username of the selected user
+
+```php
+public function selectUser($username)
+{
+    $this->username = $username;
+    $this->search = '';
+    $this->searchResults = [];
+}
+```
+
+**Usage:**
+```php
+@foreach($searchResults as $user)
+    <div wire:click="selectUser('{{ $user->username }}')">
+        @{{ $user->username }}
+    </div>
+@endforeach
+```
+
+### addViewer()
+
+Validates and grants viewer access to the specified user.
+
+```php
+public function addViewer()
+{
+    $this->validate([
+        'username' => 'required|exists:users,username'
+    ], [
+        'username.exists' => 'No encontramos ningún usuario con ese Nick.',
+    ]);
+
+    $viewer = User::where('username', $this->username)->first();
+
+    if ($viewer->id === auth()->id()) {
+        throw ValidationException::withMessages(['username' => 'No puedes compartirte datos a ti mismo.']);
+    }
+
+    if (auth()->user()->allowedViewers()->where('viewer_id', $viewer->id)->exists()) {
+        throw ValidationException::withMessages(['username' => 'Este usuario ya tiene acceso a tus datos.']);
+    }
+
+    auth()->user()->allowedViewers()->attach($viewer->id);
+
+    $this->username = '';
+    session()->flash('status', "Acceso concedido a @{$viewer->username}.");
+}
+```
+
+**Validation Checks:**
+1. Username must exist in the database
+2. User cannot grant access to themselves
+3. User cannot grant duplicate access
+
+**Side Effects:**
+- Creates a relationship in the `allowedViewers()` pivot table
+- Flashes a success message to the session
+- Resets the username field
+
+**Usage:**
+```php
+<button wire:click="addViewer">Grant Access</button>
+```
+
+### removeViewer($id)
+
+Revokes viewer access for a specific user.
+
+**Parameters:**
+- `$id` (int) - User ID of the viewer to remove
+
+```php
+public function removeViewer($id)
+{
+    auth()->user()->allowedViewers()->detach($id);
+}
+```
+
+**Usage:**
+```php
+<button wire:click="removeViewer({{ $viewer->id }})">Remove Access</button>
+```
+
+## Validation Rules
+
+### addViewer()
+
+| Field | Rules | Custom Messages |
+|-------|-------|----------------|
+| `username` | required, exists:users,username | `exists`: "No encontramos ningún usuario con ese Nick." |
+
+### Custom Validation Errors
+
+| Condition | Error Message |
+|-----------|---------------|
+| User tries to share with themselves | "No puedes compartirte datos a ti mismo." |
+| User already has access | "Este usuario ya tiene acceso a tus datos." |
+
+## Render Data
+
+The `render()` method provides the following data to the view:
+
+```php
+public function render()
+{
+    return view('livewire.profile.share-data', [
+        'viewers' => auth()->user()->allowedViewers
+    ]);
+}
+```
+
+| Variable | Type | Description |
+|----------|------|-------------|
+| `viewers` | `Collection` | List of users who have viewer access |
+
+## Component Usage
+
+### Basic Implementation
+
+```php
+<livewire:profile.share-data />
+```
+
+### Complete Blade Template Example
+
+```php
+<div>
+    <h2>Share Your Health Data</h2>
+
+    @if (session()->has('status'))
+        <div class="alert alert-success">
+            {{ session('status') }}
+        </div>
+    @endif
+
+    <!-- Search and Add Section -->
+    <div>
+        <label for="search">Search Users</label>
+        <input 
+            type="text" 
+            id="search" 
+            wire:model.live="search" 
+            placeholder="Type to search..."
+        />
+
+        @if(count($searchResults) > 0)
+            <div class="search-results">
+                @foreach($searchResults as $user)
+                    <div 
+                        wire:click="selectUser('{{ $user->username }}')"
+                        class="search-result-item"
+                    >
+                        <span>@{{ $user->username }}</span>
+                        <span>{{ $user->name }}</span>
+                    </div>
+                @endforeach
+            </div>
+        @endif
+    </div>
+
+    <div>
+        <label for="username">Username</label>
+        <input 
+            type="text" 
+            id="username" 
+            wire:model="username" 
+            placeholder="Enter username"
+        />
+        @error('username') 
+            <span class="error">{{ $message }}</span> 
+        @enderror
+    </div>
+
+    <button wire:click="addViewer">
+        Grant Access
+    </button>
+
+    <!-- Current Viewers List -->
+    <div class="viewers-list">
+        <h3>Users with Access</h3>
+        
+        @if($viewers->isEmpty())
+            <p>No users have access to your data yet.</p>
+        @else
+            @foreach($viewers as $viewer)
+                <div class="viewer-item">
+                    <div>
+                        <strong>@{{ $viewer->username }}</strong>
+                        <span>{{ $viewer->name }}</span>
+                    </div>
+                    <button 
+                        wire:click="removeViewer({{ $viewer->id }})"
+                        wire:confirm="Are you sure you want to revoke access for this user?"
+                    >
+                        Remove
+                    </button>
+                </div>
+            @endforeach
+        @endif
+    </div>
+</div>
+```
+
+### With Loading States
+
+```php
+<div>
+    <!-- Search with loading indicator -->
+    <input 
+        type="text" 
+        wire:model.live="search" 
+        placeholder="Search users..."
+    />
+    <span wire:loading wire:target="updatedSearch">Searching...</span>
+
+    <!-- Add button with loading state -->
+    <button 
+        wire:click="addViewer" 
+        wire:loading.attr="disabled"
+    >
+        <span wire:loading.remove wire:target="addViewer">Grant Access</span>
+        <span wire:loading wire:target="addViewer">Adding...</span>
+    </button>
+
+    <!-- Remove button with loading state -->
+    @foreach($viewers as $viewer)
+        <button 
+            wire:click="removeViewer({{ $viewer->id }})" 
+            wire:loading.attr="disabled"
+        >
+            <span wire:loading.remove wire:target="removeViewer">Remove</span>
+            <span wire:loading wire:target="removeViewer">Removing...</span>
+        </button>
+    @endforeach
+</div>
+```
+
+## Database Relationships
+
+This component relies on the following relationship defined in the User model:
+
+```php
+// In App\Models\User
+public function allowedViewers()
+{
+    return $this->belongsToMany(User::class, 'data_viewers', 'user_id', 'viewer_id');
+}
+```
+
+The relationship uses a pivot table with the following structure:
+- `user_id` - The user who owns the data
+- `viewer_id` - The user who has viewer access
+
+## Security Considerations
+
+1. **Self-sharing prevention**: Users cannot grant access to themselves
+2. **Duplicate prevention**: The same user cannot be added multiple times
+3. **User isolation**: Search results exclude the authenticated user
+4. **Authorization**: Only the authenticated user can manage their own viewers
+
+## Dependencies
+
+- `App\Models\User` - User model with allowedViewers relationship
+- `Illuminate\Validation\ValidationException` - For custom validation errors
+
+## Example Use Cases
+
+### Family Health Monitoring
+```php
+<!-- Parents sharing child's health data with doctor -->
+<livewire:profile.share-data />
+```
+
+### Healthcare Provider Access
+```php
+<!-- Patient granting access to healthcare provider -->
+<div>
+    <p>Share your health data with your healthcare provider</p>
+    <livewire:profile.share-data />
+</div>
+```
+
+### Temporary Access
+```php
+<!-- Grant temporary access and remove later -->
+<div>
+    <livewire:profile.share-data />
+    <p class="note">You can revoke access at any time by clicking Remove.</p>
+</div>
+```

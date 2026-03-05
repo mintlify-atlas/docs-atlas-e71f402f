@@ -1,0 +1,160 @@
+---
+title: FileController
+description: Controller for serving attachment files with role-based access control
+---
+
+## Overview
+
+The `FileController` provides file serving functionality with advanced authorization, supporting both owner access and role-based viewing permissions.
+
+**Namespace:** `App\Http\Controllers`
+
+**Class:** `FileController`
+
+## Methods
+
+### show()
+
+Retrieves and serves an attachment file with role-based authorization checks.
+
+**Route:** `GET /attachment/{id}`
+
+**Route Name:** `attachment.show`
+
+**Middleware:** `auth`, `verified`
+
+**Authentication:** Required
+
+#### Description
+
+This method serves attachment files with flexible authorization:
+1. File owners can always access their attachments
+2. Users with special viewing permissions (e.g., doctors, admins) can access patient files
+3. Returns the file with appropriate headers for browser display
+
+The method uses the `canView()` method on the User model to determine if a user has permission to view another user's attachments.
+
+#### Request Parameters
+
+| Parameter | Type | Location | Required | Description |
+|-----------|------|----------|----------|-------------|
+| id | integer | Route | Yes | Attachment ID |
+
+#### Response
+
+**Success (200):** File content with appropriate MIME type and headers
+
+**Forbidden (403):** User does not have permission to view the file
+- Message: "No tienes permiso para ver este archivo."
+
+**Not Found (404):** Attachment or file does not exist
+
+#### Code Example
+
+```php
+public function show($id)
+{
+    $attachment = Attachment::findOrFail($id);
+    $currentUser = auth()->user();
+
+    if ($attachment->user_id !== $currentUser->id && !$currentUser->canView($attachment->user_id)) {
+        abort(403, 'No tienes permiso para ver este archivo.');
+    }
+
+    if (!Storage::disk('local')->exists($attachment->file_path)) {
+        abort(404);
+    }
+
+    return Storage::disk('local')->response($attachment->file_path);
+}
+```
+
+#### HTTP Request Example
+
+```bash
+# View an attachment (own file)
+curl -X GET https://your-domain.com/attachment/456 \
+  -H "Cookie: your_session_cookie" \
+  --output file.pdf
+
+# View a patient's attachment (as doctor/admin)
+curl -X GET https://your-domain.com/attachment/789 \
+  -H "Cookie: doctor_session_cookie" \
+  --output patient-file.pdf
+```
+
+#### Usage in Blade
+
+```php
+{{-- Display attachment in iframe --}}
+<iframe src="{{ route('attachment.show', $attachment->id) }}" 
+        width="100%" 
+        height="600px">
+</iframe>
+
+{{-- Download link --}}
+<a href="{{ route('attachment.show', $attachment->id) }}" 
+   download="{{ $attachment->original_name }}">
+    Download {{ $attachment->original_name }}
+</a>
+```
+
+#### Authorization Logic
+
+The authorization follows this flow:
+
+```php
+// 1. Check if user is the owner
+if ($attachment->user_id === $currentUser->id) {
+    // Access granted
+}
+
+// 2. Check if user has viewing permissions (doctor, admin)
+if ($currentUser->canView($attachment->user_id)) {
+    // Access granted
+}
+
+// 3. Otherwise, deny access
+abort(403);
+```
+
+#### Error Responses
+
+```bash
+# 403 Forbidden - No permission
+HTTP/1.1 403 Forbidden
+Content-Type: text/html
+
+No tienes permiso para ver este archivo.
+```
+
+```bash
+# 404 Not Found - Attachment doesn't exist
+HTTP/1.1 404 Not Found
+Content-Type: text/html
+
+Not Found
+```
+
+## Comparison with AttachmentController
+
+| Feature | FileController | AttachmentController |
+|---------|----------------|----------------------|
+| Route binding | Manual ID lookup | Model binding |
+| Authorization | Owner + role-based | Owner only |
+| Response type | `Storage::response()` | `response()->file()` |
+| Use case | Shared/viewable files | Strictly private files |
+
+## Security
+
+- Uses `findOrFail()` to validate attachment existence
+- Owner verification for basic access control
+- Role-based permission checking via `canView()` method
+- File existence validation prevents path traversal
+- Stored files served through Laravel's storage facade
+
+## Dependencies
+
+- `App\Models\Attachment`
+- `Illuminate\Support\Facades\Storage`
+- User model must implement `canView()` method

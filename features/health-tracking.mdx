@@ -1,0 +1,288 @@
+---
+title: 'Health Tracking'
+description: 'Monitor your weight, blood pressure, and heart rate with comprehensive measurement logging'
+---
+
+## Overview
+
+Health Manager provides robust tracking capabilities for key health metrics including weight measurements and cardiovascular readings (blood pressure and heart rate). All measurements are timestamped and displayed chronologically on your calendar.
+
+<Note>
+  Health tracking data is stored securely and can be shared with healthcare providers or family members through the data sharing feature.
+</Note>
+
+## Weight Tracking
+
+### Recording Weight Measurements
+
+Track your weight over time to monitor trends and progress toward health goals.
+
+#### How to Log Weight
+
+1. **Access the Weight Form**:
+   - Click the FAB (Floating Action Button) in the bottom-right corner
+   - Select "Registrar Peso" (Log Weight) with the blue scale icon
+   - Or navigate directly from the calendar interface
+
+2. **Enter Weight Details**:
+   - **Weight**: Enter your weight (1-500 kg range)
+   - **Date & Time**: Select when the measurement was taken (defaults to current time)
+
+3. **Save**: Click the save button to record the measurement
+
+<Tip>
+  For most accurate trends, weigh yourself at the same time each day, preferably in the morning before eating.
+</Tip>
+
+### Weight Data Model
+
+Weight measurements are stored with the following attributes:
+
+```php
+protected $casts = [
+    'date' => 'datetime',
+    'weight' => 'decimal:2',
+];
+```
+
+- **Precision**: Weight is stored with 2 decimal places for accuracy
+- **Validation**: Weight must be between 1 and 500 kg
+- **User Association**: Each measurement is linked to the user account
+
+### Weight Trends
+
+The calendar dashboard automatically calculates:
+
+- **Latest Weight**: Your most recent measurement
+- **Weight Difference**: Change from previous measurement
+  - Positive difference shown in red (weight gain)
+  - Negative difference shown in green (weight loss)
+- **Historical Tracking**: All measurements viewable by date on the calendar
+
+### Editing Weight Entries
+
+To modify a previous weight entry:
+
+1. Click on the day in the calendar containing the measurement
+2. Find the weight entry in the day details modal
+3. Click the edit button next to the measurement
+4. Update the weight or timestamp as needed
+5. Save your changes
+
+<Note>
+  Only the measurement owner can edit or delete weight entries. Shared viewers have read-only access.
+</Note>
+
+## Blood Pressure & Heart Rate Tracking
+
+### Recording Cardiovascular Measurements
+
+Track your blood pressure (systolic/diastolic) and heart rate in a single entry.
+
+#### How to Log Blood Pressure
+
+1. **Access the Heart Form**:
+   - Click the FAB in the bottom-right corner
+   - Select "Presión Arterial" (Blood Pressure) with the red heart icon
+
+2. **Enter Measurements**:
+   - **Systolic Pressure**: Upper number (50-250 mmHg range)
+   - **Diastolic Pressure**: Lower number (30-150 mmHg range)
+   - **Heart Rate (BPM)**: Beats per minute (30-220 range)
+   - **Date & Time**: When the measurement was taken
+
+3. **Save**: Record the complete cardiovascular reading
+
+<CardGroup cols={3}>
+  <Card title="Systolic" icon="arrow-up">
+    Upper blood pressure number measuring arterial pressure during heartbeat (50-250 mmHg)
+  </Card>
+  <Card title="Diastolic" icon="arrow-down">
+    Lower blood pressure number measuring arterial pressure between beats (30-150 mmHg)
+  </Card>
+  <Card title="Heart Rate" icon="heart-pulse">
+    Pulse rate in beats per minute indicating heart rhythm (30-220 BPM)
+  </Card>
+</CardGroup>
+
+### Blood Pressure Data Model
+
+Cardiovascular measurements use the `MeasurementHeart` model:
+
+```php
+protected $casts = [
+    'date' => 'datetime',
+];
+```
+
+Stored fields:
+- `systolic` - Integer value for systolic pressure
+- `diastolic` - Integer value for diastolic pressure  
+- `bpm` - Integer value for heart rate
+- `date` - Timestamp of measurement
+- `user_id` - Associated user
+
+### Validation Rules
+
+The system enforces medically reasonable ranges:
+
+```php
+[
+    'systolic' => 'required|integer|min:50|max:250',
+    'diastolic' => 'required|integer|min:30|max:150',
+    'bpm' => 'required|integer|min:30|max:220',
+    'date' => 'required|date',
+]
+```
+
+<Tip>
+  These ranges accommodate both normal readings and extreme medical situations while preventing obvious data entry errors.
+</Tip>
+
+### Understanding Blood Pressure Readings
+
+**Normal Range**: Typically 120/80 mmHg or lower
+
+- **Elevated**: Systolic 120-129, Diastolic < 80
+- **High Blood Pressure (Stage 1)**: Systolic 130-139 or Diastolic 80-89
+- **High Blood Pressure (Stage 2)**: Systolic ≥ 140 or Diastolic ≥ 90
+
+<Note>
+  Always consult with your healthcare provider to interpret your blood pressure readings and determine appropriate target ranges for your individual health situation.
+</Note>
+
+### Editing Blood Pressure Entries
+
+Modify previous cardiovascular readings:
+
+1. Select the day on the calendar with the reading
+2. Open the day details modal
+3. Click edit on the heart rate entry
+4. Update any of the three measurements (systolic, diastolic, BPM)
+5. Adjust the timestamp if needed
+6. Save your changes
+
+## Best Practices for Health Tracking
+
+<CardGroup cols={2}>
+  <Card title="Consistency" icon="clock">
+    Take measurements at the same time daily for comparable data. Morning readings are often most consistent.
+  </Card>
+  <Card title="Accurate Recording" icon="check">
+    Log measurements immediately after taking them to ensure accuracy and prevent forgetting.
+  </Card>
+  <Card title="Multiple Readings" icon="repeat">
+    For blood pressure, consider taking 2-3 readings a few minutes apart and recording the average.
+  </Card>
+  <Card title="Note Circumstances" icon="note-sticky">
+    Be aware that stress, caffeine, exercise, and medications can affect readings.
+  </Card>
+</CardGroup>
+
+## Data Workflow
+
+The health tracking workflow follows this pattern:
+
+1. **User initiates logging** via FAB or calendar
+2. **Modal form opens** with current timestamp pre-filled
+3. **User enters measurements** with real-time validation
+4. **Data saves to database** with user association
+5. **Events dispatch** to refresh calendar and history views
+6. **Visual indicators update** on the calendar day
+
+### Real-time Updates
+
+After saving a measurement:
+
+```php
+$this->dispatch('close-modal', 'log-weight');
+$this->dispatch('refresh-calendar');
+$this->dispatch('refresh-history');
+```
+
+This ensures:
+- Modal closes automatically
+- Calendar updates to show the new entry indicator
+- History views refresh with the latest data
+- No page reload required
+
+## Viewing Historical Data
+
+### Calendar Day View
+
+Click any calendar day to see all measurements for that date:
+
+- Weight measurements sorted by most recent first
+- Blood pressure readings with all three values (systolic/diastolic/BPM)
+- Exact timestamps for each measurement
+- Edit and delete options for your own entries
+
+### Monthly Overview
+
+The calendar provides a bird's-eye view:
+
+- Blue dots indicate days with weight measurements
+- Red dots show days with blood pressure readings
+- Multiple measurements per day are supported
+- Quick visual pattern recognition
+
+## Data Sharing
+
+Health measurements can be shared with:
+
+- Healthcare providers for remote monitoring
+- Family members for health accountability
+- Medical professionals for appointment preparation
+
+When data is shared:
+- Viewers see all historical measurements
+- Viewers cannot edit or delete your data
+- You maintain full control over access
+- Revoke access anytime
+
+Learn more about [Data Sharing](/features/data-sharing).
+
+## Technical Implementation
+
+### Weight Logging Component
+
+**Livewire Component**: `App\Livewire\Dashboard\WeightLog`
+
+- Handles both creating new entries and editing existing ones
+- Pre-fills current timestamp for convenience
+- Validates weight range (1-500 kg)
+- Supports edit mode via `edit-weight-item` listener
+
+### Heart Rate Logging Component
+
+**Livewire Component**: `App\Livewire\Dashboard\HeartLog`
+
+- Manages systolic, diastolic, and BPM in single form
+- Enforces medical range validations
+- Supports editing via `edit-heart-item` listener
+- Groups related cardiovascular metrics together
+
+### Database Storage
+
+Both models extend Laravel's base Model with:
+
+```php
+use HasFactory;
+protected $guarded = [];
+
+public function user(): BelongsTo
+{
+    return $this->belongsTo(User::class);
+}
+```
+
+This provides:
+- Factory support for testing and seeding
+- Mass assignment protection control
+- User relationship for data isolation
+
+## Related Features
+
+- [Interactive Calendar](/features/calendar) - View all health data in calendar format
+- [Medical Appointments](/features/appointments) - Track doctor visits
+- [Data Sharing](/features/data-sharing) - Share health metrics with others

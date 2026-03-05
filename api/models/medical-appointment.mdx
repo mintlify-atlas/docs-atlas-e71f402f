@@ -1,0 +1,355 @@
+---
+title: 'MedicalAppointment Model'
+description: 'Complete documentation for the MedicalAppointment model including appointments, attachments, and user relationships'
+---
+
+## Overview
+
+The `MedicalAppointment` model represents medical appointments in Health Manager. It tracks appointment details, supports file attachments through polymorphic relationships, and belongs to a user.
+
+### Namespace
+
+```php
+App\Models\MedicalAppointment
+```
+
+### Class Declaration
+
+```php
+class MedicalAppointment extends Model
+```
+
+## Database Schema
+
+The `medical_appointments` table includes the following columns:
+
+<ResponseField name="id" type="bigint" required>
+  Primary key, auto-incrementing
+</ResponseField>
+
+<ResponseField name="user_id" type="bigint" required>
+  Foreign key referencing users table (cascades on delete)
+</ResponseField>
+
+<ResponseField name="title" type="string" required>
+  Appointment title or subject
+</ResponseField>
+
+<ResponseField name="date" type="datetime" required>
+  Date and time of the appointment
+</ResponseField>
+
+<ResponseField name="description" type="text">
+  Optional detailed description of the appointment
+</ResponseField>
+
+<ResponseField name="file_path" type="string">
+  Legacy file path (deprecated - use attachments relationship instead)
+</ResponseField>
+
+<ResponseField name="created_at" type="timestamp">
+  Record creation timestamp
+</ResponseField>
+
+<ResponseField name="updated_at" type="timestamp">
+  Record last update timestamp
+</ResponseField>
+
+## Fillable Attributes
+
+These attributes can be mass assigned:
+
+<ParamField path="user_id" type="integer" required>
+  ID of the user who owns this appointment
+</ParamField>
+
+<ParamField path="title" type="string" required>
+  Appointment title (e.g., "Annual Checkup", "Cardiology Consultation")
+</ParamField>
+
+<ParamField path="date" type="datetime" required>
+  Date and time of the appointment in Y-m-d H:i:s format
+</ParamField>
+
+<ParamField path="description" type="string">
+  Detailed description, notes, or instructions for the appointment
+</ParamField>
+
+<ParamField path="file_path" type="string">
+  Legacy field for single file attachment (use attachments relationship for multiple files)
+</ParamField>
+
+## Casts
+
+```php
+[
+    'date' => 'datetime',
+]
+```
+
+The `date` attribute is automatically cast to a Carbon datetime instance.
+
+## Relationships
+
+### user()
+
+Belongs to relationship with the User model.
+
+<Expandable title="Relationship Details">
+  <ResponseField name="type" type="BelongsTo">
+    One-to-many inverse relationship
+  </ResponseField>
+  
+  <ResponseField name="related" type="User">
+    Related to User model
+  </ResponseField>
+  
+  <ResponseField name="foreignKey" type="user_id">
+    Foreign key on medical_appointments table
+  </ResponseField>
+</Expandable>
+
+```php
+public function user(): BelongsTo
+{
+    return $this->belongsTo(User::class);
+}
+```
+
+**Example Usage:**
+
+```php
+$appointment = MedicalAppointment::find(1);
+$userName = $appointment->user->name;
+```
+
+### attachments()
+
+Polymorphic relationship for file attachments.
+
+<Expandable title="Relationship Details">
+  <ResponseField name="type" type="MorphMany">
+    One-to-many polymorphic relationship
+  </ResponseField>
+  
+  <ResponseField name="related" type="Attachment">
+    Related to Attachment model
+  </ResponseField>
+  
+  <ResponseField name="morphName" type="model">
+    Polymorphic relationship name
+  </ResponseField>
+  
+  <ResponseField name="morphType" type="model_type">
+    Stores 'App\\Models\\MedicalAppointment'
+  </ResponseField>
+  
+  <ResponseField name="morphId" type="model_id">
+    Stores the appointment ID
+  </ResponseField>
+</Expandable>
+
+```php
+public function attachments(): MorphMany
+{
+    return $this->morphMany(Attachment::class, 'model');
+}
+```
+
+**Example Usage:**
+
+```php
+$appointment = MedicalAppointment::find(1);
+
+// Get all attachments
+$files = $appointment->attachments;
+
+// Add new attachment
+$appointment->attachments()->create([
+    'file_path' => 'appointments/lab-results.pdf',
+    'file_name' => 'lab-results.pdf',
+]);
+```
+
+## Usage Examples
+
+### Creating a Medical Appointment
+
+```php
+use App\Models\MedicalAppointment;
+use Carbon\Carbon;
+
+// Create appointment for current user
+$appointment = MedicalAppointment::create([
+    'user_id' => auth()->id(),
+    'title' => 'Annual Physical Exam',
+    'date' => Carbon::parse('2026-03-15 10:00:00'),
+    'description' => 'Routine annual checkup with Dr. Smith',
+]);
+
+echo "Appointment created with ID: {$appointment->id}";
+```
+
+### Creating Appointment with Attachments
+
+```php
+$appointment = MedicalAppointment::create([
+    'user_id' => auth()->id(),
+    'title' => 'Cardiology Follow-up',
+    'date' => now()->addDays(7),
+    'description' => 'Review EKG results',
+]);
+
+// Add multiple attachments
+$appointment->attachments()->createMany([
+    [
+        'file_path' => 'storage/appointments/ekg-results.pdf',
+        'file_name' => 'EKG Results.pdf',
+    ],
+    [
+        'file_path' => 'storage/appointments/blood-work.pdf',
+        'file_name' => 'Blood Work Results.pdf',
+    ],
+]);
+```
+
+### Querying Appointments
+
+```php
+// Get all appointments for a user
+$userAppointments = MedicalAppointment::where('user_id', auth()->id())
+    ->orderBy('date', 'desc')
+    ->get();
+
+// Get upcoming appointments
+$upcoming = MedicalAppointment::where('user_id', auth()->id())
+    ->where('date', '>', now())
+    ->orderBy('date', 'asc')
+    ->get();
+
+// Get appointments with attachments
+$withFiles = MedicalAppointment::with('attachments')
+    ->where('user_id', auth()->id())
+    ->get();
+
+// Get appointments for specific date range
+$january = MedicalAppointment::where('user_id', auth()->id())
+    ->whereBetween('date', [
+        Carbon::parse('2026-01-01'),
+        Carbon::parse('2026-01-31')
+    ])
+    ->get();
+```
+
+### Updating an Appointment
+
+```php
+$appointment = MedicalAppointment::find(1);
+
+$appointment->update([
+    'title' => 'Cardiology Consultation - Updated',
+    'date' => Carbon::parse('2026-03-20 14:30:00'),
+    'description' => 'Updated: Bring previous test results',
+]);
+```
+
+### Working with Relationships
+
+```php
+$appointment = MedicalAppointment::find(1);
+
+// Access user information
+$patientName = $appointment->user->name;
+$patientEmail = $appointment->user->email;
+
+// Eager load relationships for better performance
+$appointments = MedicalAppointment::with(['user', 'attachments'])
+    ->where('date', '>', now())
+    ->get();
+
+foreach ($appointments as $appointment) {
+    echo "{$appointment->title} - {$appointment->user->name}\n";
+    echo "Files: {$appointment->attachments->count()}\n";
+}
+```
+
+### Filtering by Date
+
+```php
+use Carbon\Carbon;
+
+// Today's appointments
+$today = MedicalAppointment::whereDate('date', today())
+    ->where('user_id', auth()->id())
+    ->get();
+
+// This week's appointments
+$thisWeek = MedicalAppointment::whereBetween('date', [
+        now()->startOfWeek(),
+        now()->endOfWeek()
+    ])
+    ->where('user_id', auth()->id())
+    ->get();
+
+// Past appointments
+$history = MedicalAppointment::where('date', '<', now())
+    ->where('user_id', auth()->id())
+    ->orderBy('date', 'desc')
+    ->paginate(10);
+```
+
+### Deleting an Appointment
+
+```php
+$appointment = MedicalAppointment::find(1);
+
+// Delete appointment (attachments are handled by polymorphic relationship)
+$appointment->delete();
+
+// Or delete with attachments explicitly
+$appointment->attachments()->delete();
+$appointment->delete();
+```
+
+## JSON Serialization Example
+
+```php
+$appointment = MedicalAppointment::with('attachments')->find(1);
+
+return response()->json($appointment);
+```
+
+**Output:**
+
+```json
+{
+  "id": 1,
+  "user_id": 5,
+  "title": "Annual Physical Exam",
+  "date": "2026-03-15T10:00:00.000000Z",
+  "description": "Routine checkup with Dr. Smith",
+  "file_path": null,
+  "created_at": "2026-03-05T08:30:00.000000Z",
+  "updated_at": "2026-03-05T08:30:00.000000Z",
+  "attachments": [
+    {
+      "id": 1,
+      "model_type": "App\\Models\\MedicalAppointment",
+      "model_id": 1,
+      "file_path": "storage/appointments/lab-results.pdf",
+      "file_name": "Lab Results.pdf",
+      "created_at": "2026-03-05T08:31:00.000000Z",
+      "updated_at": "2026-03-05T08:31:00.000000Z"
+    }
+  ]
+}
+```
+
+## Traits Used
+
+- `HasFactory` - Enables model factories for testing and seeding
+
+## Related Models
+
+- [User](/api/models/user)
+- [ActivityExercise](/api/models/activity-exercise)

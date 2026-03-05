@@ -1,0 +1,181 @@
+---
+title: 'Interactive Calendar'
+description: 'View and manage all your health activities in one centralized calendar interface'
+---
+
+## Overview
+
+The Interactive Calendar is the central hub of Health Manager, providing a comprehensive view of all your health tracking activities including weight measurements, blood pressure readings, exercise sessions, and medical appointments.
+
+<Note>
+  The calendar displays data grouped by day, with visual indicators showing which types of activities have been logged for each date.
+</Note>
+
+## Calendar Features
+
+<CardGroup cols={2}>
+  <Card title="Monthly View" icon="calendar">
+    Navigate through months to view your complete health history with color-coded activity indicators.
+  </Card>
+  <Card title="Quick Navigation" icon="arrows-rotate">
+    Jump to the current month instantly or move forward and backward month by month.
+  </Card>
+  <Card title="Day Details" icon="magnifying-glass">
+    Click any day to see all activities logged on that date with full details.
+  </Card>
+  <Card title="Activity Indicators" icon="circle-dot">
+    Visual badges show when you've logged weight, heart rate, exercise, or appointments.
+  </Card>
+</CardGroup>
+
+## Using the Calendar
+
+### Navigating Months
+
+The calendar header displays the current month and year (e.g., "March 2026"). Use the navigation controls:
+
+- **Previous Month**: Click the left arrow to go back one month
+- **Next Month**: Click the right arrow to advance one month
+- **Current Month**: Click the "Today" button to return to the current month
+
+### Understanding Activity Indicators
+
+Each calendar day displays small colored badges to indicate logged activities:
+
+- **Blue Badge**: Weight measurement recorded
+- **Red Badge**: Blood pressure/heart rate reading logged
+- **Orange Badge**: Exercise activity completed
+- **Green Badge**: Medical appointment scheduled or completed
+
+<Tip>
+  Multiple badges on a single day indicate you've been particularly diligent with your health tracking!
+</Tip>
+
+### Viewing Day Details
+
+Click on any day in the calendar to open a detailed modal showing:
+
+- All weight measurements with timestamps
+- Blood pressure readings (systolic/diastolic/BPM)
+- Exercise activities with duration and descriptions
+- Medical appointments with titles, descriptions, and attached files
+
+## Dashboard Statistics
+
+The calendar view includes helpful statistics at the top:
+
+### Next Appointment
+Displays your upcoming medical appointment with the date and title, helping you stay prepared.
+
+### Latest Weight
+Shows your most recent weight measurement with the difference from your previous recording:
+- **Green indicator**: Weight decreased
+- **Red indicator**: Weight increased
+- Helps you track weight trends at a glance
+
+### Weekly Exercise Summary
+Displays:
+- Total exercise minutes for the past 7 days
+- Number of exercise sessions completed this week
+- Helps you monitor if you're meeting weekly activity goals
+
+## Floating Action Button (FAB)
+
+<Note>
+  Located in the bottom-right corner, the FAB provides quick access to log new activities without navigating away from the calendar.
+</Note>
+
+The Floating Action Button features:
+
+1. **Main Button**: Large indigo button with a plus (+) icon
+2. **Expandable Menu**: Click to reveal four quick-action buttons:
+   - **Nueva Cita** (New Appointment) - Green badge with doctor icon
+   - **Ejercicio** (Exercise) - Orange badge with running icon
+   - **Registrar Peso** (Log Weight) - Blue badge with scale icon
+   - **Presión Arterial** (Blood Pressure) - Red badge with heart icon
+
+### Quick Logging Workflow
+
+1. Click the main FAB button in the bottom-right corner
+2. The button rotates 45° and reveals the menu with animated transitions
+3. Select the type of activity you want to log
+4. Fill out the modal form that appears
+5. Save your entry - the calendar automatically updates
+
+<Tip>
+  The FAB menu closes automatically after selecting an action, providing a smooth user experience.
+</Tip>
+
+## Viewer Mode
+
+When viewing another user's shared data, the calendar operates in **read-only mode**:
+
+- A blue banner appears explaining you're in "Modo Espectador" (Viewer Mode)
+- The FAB quick-action menu is hidden
+- You can view all calendar data but cannot create or edit entries
+- Full navigation and day detail viewing remains available
+
+## Data Organization
+
+The calendar component queries data efficiently:
+
+```php
+// Activities are grouped by date
+$hearts = MeasurementHeart::where('user_id', $userId)
+    ->whereBetween('date', $dateRange)
+    ->get()
+    ->groupBy(fn($v) => $v->date->format('Y-m-d'));
+```
+
+This approach:
+- Loads only the current month's data for optimal performance
+- Groups activities by day for easy rendering
+- Updates automatically when new entries are added
+
+## Technical Implementation
+
+The calendar is built using:
+
+- **Livewire Component**: `App\Livewire\Dashboard\Calendar`
+- **Real-time Updates**: Listens for `refresh-calendar` events
+- **AlpineJS**: Handles FAB menu animations and interactions
+- **Carbon Dates**: Provides robust date handling and formatting
+
+### Calendar Day Structure
+
+Each day in the calendar contains:
+
+```php
+[
+    'date' => Carbon instance,
+    'isCurrentMonth' => boolean,
+    'isToday' => boolean,
+    'hasHeart' => boolean,
+    'hasWeight' => boolean,
+    'hasExercise' => boolean,
+    'hasAppointment' => boolean,
+]
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Regular Logging" icon="calendar-check">
+    Log activities on the same day they occur for accurate historical records and trend analysis.
+  </Card>
+  <Card title="Review Patterns" icon="chart-line">
+    Use the monthly view to identify patterns in your health activities and maintain consistency.
+  </Card>
+  <Card title="Plan Ahead" icon="calendar-days">
+    Check upcoming appointments and plan your week's exercise schedule using the calendar overview.
+  </Card>
+  <Card title="Track Progress" icon="trophy">
+    Monitor your weekly exercise statistics to ensure you're meeting your fitness goals.
+  </Card>
+</CardGroup>
+
+## Related Features
+
+- [Health Tracking](/features/health-tracking) - Learn about logging weight and blood pressure
+- [Medical Appointments](/features/appointments) - Manage your medical appointments
+- [Data Sharing](/features/data-sharing) - Share your calendar with healthcare providers

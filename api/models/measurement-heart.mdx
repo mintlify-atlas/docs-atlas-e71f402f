@@ -1,0 +1,473 @@
+---
+title: 'MeasurementHeart Model'
+description: 'Complete documentation for the MeasurementHeart model for tracking heart rate and blood pressure measurements'
+---
+
+## Overview
+
+The `MeasurementHeart` model tracks cardiovascular health metrics including heart rate (BPM), systolic blood pressure, and diastolic blood pressure for users in Health Manager.
+
+### Namespace
+
+```php
+App\Models\MeasurementHeart
+```
+
+### Class Declaration
+
+```php
+class MeasurementHeart extends Model
+```
+
+## Database Schema
+
+The `measurement_hearts` table includes the following columns:
+
+<ResponseField name="id" type="bigint" required>
+  Primary key, auto-incrementing
+</ResponseField>
+
+<ResponseField name="user_id" type="bigint" required>
+  Foreign key referencing users table (cascades on delete)
+</ResponseField>
+
+<ResponseField name="date" type="datetime" required>
+  Date and time when the measurement was taken
+</ResponseField>
+
+<ResponseField name="bpm" type="integer" required>
+  Heart rate in beats per minute
+</ResponseField>
+
+<ResponseField name="systolic" type="integer" required>
+  Systolic blood pressure (upper number) in mmHg
+</ResponseField>
+
+<ResponseField name="diastolic" type="integer" required>
+  Diastolic blood pressure (lower number) in mmHg
+</ResponseField>
+
+<ResponseField name="created_at" type="timestamp">
+  Record creation timestamp
+</ResponseField>
+
+<ResponseField name="updated_at" type="timestamp">
+  Record last update timestamp
+</ResponseField>
+
+## Guarded Attributes
+
+This model uses `$guarded = []`, meaning all attributes are mass assignable:
+
+<ParamField path="user_id" type="integer" required>
+  ID of the user who owns this measurement
+</ParamField>
+
+<ParamField path="date" type="datetime" required>
+  Date and time of the measurement in Y-m-d H:i:s format
+</ParamField>
+
+<ParamField path="bpm" type="integer" required>
+  Heart rate in beats per minute (e.g., 72)
+</ParamField>
+
+<ParamField path="systolic" type="integer" required>
+  Systolic blood pressure in mmHg (e.g., 120)
+</ParamField>
+
+<ParamField path="diastolic" type="integer" required>
+  Diastolic blood pressure in mmHg (e.g., 80)
+</ParamField>
+
+## Casts
+
+```php
+[
+    'date' => 'datetime',
+]
+```
+
+The `date` attribute is automatically cast to a Carbon datetime instance.
+
+## Relationships
+
+### user()
+
+Belongs to relationship with the User model.
+
+<Expandable title="Relationship Details">
+  <ResponseField name="type" type="BelongsTo">
+    One-to-many inverse relationship
+  </ResponseField>
+  
+  <ResponseField name="related" type="User">
+    Related to User model
+  </ResponseField>
+  
+  <ResponseField name="foreignKey" type="user_id">
+    Foreign key on measurement_hearts table
+  </ResponseField>
+</Expandable>
+
+```php
+public function user(): BelongsTo
+{
+    return $this->belongsTo(User::class);
+}
+```
+
+**Example Usage:**
+
+```php
+$measurement = MeasurementHeart::find(1);
+$userName = $measurement->user->name;
+```
+
+## Usage Examples
+
+### Creating Heart Measurements
+
+```php
+use App\Models\MeasurementHeart;
+use Carbon\Carbon;
+
+// Create a single measurement
+$measurement = MeasurementHeart::create([
+    'user_id' => auth()->id(),
+    'date' => now(),
+    'bpm' => 72,
+    'systolic' => 120,
+    'diastolic' => 80,
+]);
+
+echo "Vitals recorded: {$measurement->bpm} BPM, {$measurement->systolic}/{$measurement->diastolic} mmHg";
+```
+
+### Bulk Creating Measurements
+
+```php
+// Insert multiple heart measurements
+$measurements = [
+    [
+        'user_id' => auth()->id(),
+        'date' => Carbon::parse('2026-01-01 08:00:00'),
+        'bpm' => 68,
+        'systolic' => 118,
+        'diastolic' => 78,
+    ],
+    [
+        'user_id' => auth()->id(),
+        'date' => Carbon::parse('2026-01-02 08:00:00'),
+        'bpm' => 72,
+        'systolic' => 122,
+        'diastolic' => 82,
+    ],
+    [
+        'user_id' => auth()->id(),
+        'date' => Carbon::parse('2026-01-03 08:00:00'),
+        'bpm' => 70,
+        'systolic' => 120,
+        'diastolic' => 80,
+    ],
+];
+
+MeasurementHeart::insert($measurements);
+```
+
+### Querying Heart Data
+
+```php
+// Get all measurements for current user
+$allMeasurements = MeasurementHeart::where('user_id', auth()->id())
+    ->orderBy('date', 'desc')
+    ->get();
+
+// Get latest measurement
+$latest = MeasurementHeart::where('user_id', auth()->id())
+    ->latest('date')
+    ->first();
+
+if ($latest) {
+    echo "Current: {$latest->bpm} BPM, {$latest->systolic}/{$latest->diastolic} mmHg";
+}
+
+// Get measurements for specific date range
+$weekData = MeasurementHeart::where('user_id', auth()->id())
+    ->whereBetween('date', [
+        now()->subDays(7),
+        now()
+    ])
+    ->orderBy('date', 'asc')
+    ->get();
+```
+
+### Calculating Heart Statistics
+
+```php
+// Calculate average heart rate
+$avgBpm = MeasurementHeart::where('user_id', auth()->id())
+    ->avg('bpm');
+
+echo "Average heart rate: " . round($avgBpm) . " BPM";
+
+// Calculate average blood pressure
+$avgSystolic = MeasurementHeart::where('user_id', auth()->id())
+    ->avg('systolic');
+
+$avgDiastolic = MeasurementHeart::where('user_id', auth()->id())
+    ->avg('diastolic');
+
+echo "Average BP: " . round($avgSystolic) . "/" . round($avgDiastolic) . " mmHg";
+
+// Get min and max values
+$stats = [
+    'bpm' => [
+        'min' => MeasurementHeart::where('user_id', auth()->id())->min('bpm'),
+        'max' => MeasurementHeart::where('user_id', auth()->id())->max('bpm'),
+    ],
+    'systolic' => [
+        'min' => MeasurementHeart::where('user_id', auth()->id())->min('systolic'),
+        'max' => MeasurementHeart::where('user_id', auth()->id())->max('systolic'),
+    ],
+    'diastolic' => [
+        'min' => MeasurementHeart::where('user_id', auth()->id())->min('diastolic'),
+        'max' => MeasurementHeart::where('user_id', auth()->id())->max('diastolic'),
+    ],
+];
+```
+
+### Blood Pressure Classification
+
+```php
+function classifyBloodPressure($systolic, $diastolic)
+{
+    if ($systolic < 120 && $diastolic < 80) {
+        return 'Normal';
+    } elseif ($systolic < 130 && $diastolic < 80) {
+        return 'Elevated';
+    } elseif ($systolic < 140 || $diastolic < 90) {
+        return 'Hypertension Stage 1';
+    } elseif ($systolic < 180 || $diastolic < 120) {
+        return 'Hypertension Stage 2';
+    } else {
+        return 'Hypertensive Crisis';
+    }
+}
+
+$measurement = MeasurementHeart::find(1);
+$classification = classifyBloodPressure($measurement->systolic, $measurement->diastolic);
+
+echo "Blood Pressure Category: {$classification}";
+```
+
+### Updating Measurements
+
+```php
+$measurement = MeasurementHeart::find(1);
+
+$measurement->update([
+    'bpm' => 75,
+    'systolic' => 125,
+    'diastolic' => 82,
+    'date' => Carbon::parse('2026-03-05 09:30:00'),
+]);
+```
+
+### Filtering by Date
+
+```php
+use Carbon\Carbon;
+
+// Today's measurements
+$today = MeasurementHeart::whereDate('date', today())
+    ->where('user_id', auth()->id())
+    ->get();
+
+// This week's measurements
+$thisWeek = MeasurementHeart::whereBetween('date', [
+        now()->startOfWeek(),
+        now()->endOfWeek()
+    ])
+    ->where('user_id', auth()->id())
+    ->get();
+
+// Last 30 days
+$last30Days = MeasurementHeart::where('user_id', auth()->id())
+    ->where('date', '>=', now()->subDays(30))
+    ->orderBy('date', 'asc')
+    ->get();
+```
+
+### Finding Abnormal Readings
+
+```php
+// Find high blood pressure readings
+$highBP = MeasurementHeart::where('user_id', auth()->id())
+    ->where(function ($query) {
+        $query->where('systolic', '>=', 140)
+              ->orWhere('diastolic', '>=', 90);
+    })
+    ->orderBy('date', 'desc')
+    ->get();
+
+// Find high heart rate
+$highHeartRate = MeasurementHeart::where('user_id', auth()->id())
+    ->where('bpm', '>', 100)
+    ->orderBy('date', 'desc')
+    ->get();
+
+// Find low heart rate
+$lowHeartRate = MeasurementHeart::where('user_id', auth()->id())
+    ->where('bpm', '<', 60)
+    ->orderBy('date', 'desc')
+    ->get();
+```
+
+### Charting Heart Data Over Time
+
+```php
+// Get data for chart visualization
+$chartData = MeasurementHeart::where('user_id', auth()->id())
+    ->where('date', '>=', now()->subDays(30))
+    ->orderBy('date', 'asc')
+    ->get()
+    ->map(function ($measurement) {
+        return [
+            'date' => $measurement->date->format('Y-m-d'),
+            'bpm' => $measurement->bpm,
+            'systolic' => $measurement->systolic,
+            'diastolic' => $measurement->diastolic,
+        ];
+    });
+
+return response()->json($chartData);
+```
+
+### Working with User Relationship
+
+```php
+// Eager load user data
+$measurements = MeasurementHeart::with('user')
+    ->where('date', '>=', now()->subDays(7))
+    ->get();
+
+foreach ($measurements as $measurement) {
+    echo "{$measurement->user->name}: {$measurement->bpm} BPM, "
+         . "{$measurement->systolic}/{$measurement->diastolic} mmHg "
+         . "on {$measurement->date->format('M d, Y')}\n";
+}
+```
+
+### Deleting Measurements
+
+```php
+$measurement = MeasurementHeart::find(1);
+$measurement->delete();
+
+// Delete old measurements (e.g., older than 2 years)
+MeasurementHeart::where('user_id', auth()->id())
+    ->where('date', '<', now()->subYears(2))
+    ->delete();
+```
+
+## JSON Serialization Example
+
+```php
+$measurement = MeasurementHeart::with('user')->find(1);
+
+return response()->json($measurement);
+```
+
+**Output:**
+
+```json
+{
+  "id": 1,
+  "user_id": 5,
+  "date": "2026-03-05T08:00:00.000000Z",
+  "bpm": 72,
+  "systolic": 120,
+  "diastolic": 80,
+  "created_at": "2026-03-05T08:30:00.000000Z",
+  "updated_at": "2026-03-05T08:30:00.000000Z",
+  "user": {
+    "id": 5,
+    "name": "John Doe",
+    "email": "john@example.com",
+    "username": "johndoe"
+  }
+}
+```
+
+## API Response Example for Heart Health Dashboard
+
+```php
+// Controller method to get heart health summary
+public function getHeartHealthSummary()
+{
+    $measurements = MeasurementHeart::where('user_id', auth()->id())
+        ->where('date', '>=', now()->subDays(30))
+        ->orderBy('date', 'asc')
+        ->get();
+
+    $latest = $measurements->last();
+
+    return response()->json([
+        'current' => [
+            'bpm' => $latest ? $latest->bpm : null,
+            'blood_pressure' => $latest ? "{$latest->systolic}/{$latest->diastolic}" : null,
+        ],
+        'averages' => [
+            'bpm' => round($measurements->avg('bpm')),
+            'systolic' => round($measurements->avg('systolic')),
+            'diastolic' => round($measurements->avg('diastolic')),
+        ],
+        'measurements' => $measurements,
+        'count' => $measurements->count(),
+    ]);
+}
+```
+
+**Response:**
+
+```json
+{
+  "current": {
+    "bpm": 72,
+    "blood_pressure": "120/80"
+  },
+  "averages": {
+    "bpm": 70,
+    "systolic": 119,
+    "diastolic": 79
+  },
+  "measurements": [
+    {
+      "id": 1,
+      "user_id": 5,
+      "date": "2026-02-05T08:00:00.000000Z",
+      "bpm": 68,
+      "systolic": 118,
+      "diastolic": 78
+    },
+    {
+      "id": 2,
+      "user_id": 5,
+      "date": "2026-03-05T08:00:00.000000Z",
+      "bpm": 72,
+      "systolic": 120,
+      "diastolic": 80
+    }
+  ],
+  "count": 2
+}
+```
+
+## Traits Used
+
+- `HasFactory` - Enables model factories for testing and seeding
+
+## Related Models
+
+- [User](/api/models/user)
+- [MeasurementWeight](/api/models/measurement-weight)

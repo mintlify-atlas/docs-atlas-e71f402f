@@ -1,0 +1,586 @@
+---
+title: Shared Hosting Deployment
+description: Deploy Health Manager on shared hosting without SSH/console access using FTP
+---
+
+This guide is for deploying Health Manager on shared hosting environments that don't provide SSH or console access. You'll prepare the application on your local machine and upload it via FTP.
+
+## Requirements
+
+### Hosting Requirements
+
+Your shared hosting must support:
+
+- **PHP 8.4** or higher
+- **Database** (MySQL, MariaDB, PostgreSQL, or SQLite)
+- Ability to point domain to a subdirectory (for `/public` folder)
+- **FTP or File Manager** access
+
+### Required PHP Extensions
+
+Verify your hosting includes these PHP extensions:
+
+- Ctype, cURL, DOM, Fileinfo, Filter, Hash, Mbstring, OpenSSL, PCRE, PDO, Session, Tokenizer, XML, BCMath, Zip, Intl, GD, Exif
+
+<Warning>
+Contact your hosting provider if any required extensions are missing.
+</Warning>
+
+### Local Machine Requirements
+
+You'll need these tools on your computer:
+
+- **Git**
+- **Composer** (PHP dependency manager)
+- **Node.js & NPM** (for building assets)
+- **FTP Client** (FileZilla, Cyberduck, or similar)
+
+## Preparation on Local Machine
+
+<Steps>
+
+### Clone the Repository
+
+Open a terminal on your local machine:
+
+```bash
+git clone https://github.com/formatocd/health-manager.git
+cd health-manager
+```
+
+### Install Dependencies
+
+Install all dependencies and build the production assets:
+
+<CodeGroup>
+
+```bash All at Once
+composer install --no-dev --optimize-autoloader && npm install && npm run build
+```
+
+```bash Step by Step
+# Install PHP dependencies
+composer install --no-dev --optimize-autoloader
+
+# Install Node dependencies
+npm install
+
+# Build production assets
+npm run build
+```
+
+</CodeGroup>
+
+<Warning>
+The `--no-dev` flag is crucial - it prevents installing development dependencies that could expose security vulnerabilities.
+</Warning>
+
+### Generate Application Key
+
+Create the environment file and generate the encryption key:
+
+```bash
+cp .env.example .env
+php artisan key:generate
+```
+
+This creates a `.env` file with a unique `APP_KEY`.
+
+### Verify Build
+
+Ensure the build was successful:
+
+```bash
+ls -la public/build
+```
+
+You should see compiled CSS and JavaScript files.
+
+</Steps>
+
+## Configure Environment
+
+Before uploading, configure your `.env` file with your hosting details.
+
+### Application Settings
+
+```env
+APP_NAME="Health Manager"
+APP_ENV=production
+APP_DEBUG=false
+APP_URL=https://yourdomain.com
+APP_LOCALE=en
+```
+
+<Warning>
+**Critical:** Set `APP_DEBUG=false` in production to prevent exposing sensitive information.
+</Warning>
+
+### Database Configuration
+
+<CodeGroup>
+
+```env MySQL (Most Common)
+DB_CONNECTION=mysql
+DB_HOST=localhost
+DB_PORT=3306
+DB_DATABASE=your_database_name
+DB_USERNAME=your_database_user
+DB_PASSWORD=your_database_password
+```
+
+```env Remote MySQL
+DB_CONNECTION=mysql
+DB_HOST=mysql.yourdomain.com
+DB_PORT=3306
+DB_DATABASE=your_database_name
+DB_USERNAME=your_database_user
+DB_PASSWORD=your_database_password
+```
+
+```env SQLite (If Supported)
+DB_CONNECTION=sqlite
+# Database file will be created automatically
+```
+
+</CodeGroup>
+
+<Accordion title="Finding Your Database Credentials">
+
+Database credentials are typically found in:
+
+1. **cPanel:** MySQL Databases section
+2. **Plesk:** Databases panel
+3. **Custom panels:** Check hosting documentation
+4. **Email:** Welcome email from hosting provider
+
+**Common values:**
+- `DB_HOST`: Often `localhost` or `127.0.0.1`
+- `DB_PORT`: Usually `3306` for MySQL
+- Create database through hosting control panel before deployment
+
+</Accordion>
+
+### Mail Configuration
+
+```env
+MAIL_MAILER=smtp
+MAIL_HOST=smtp.yourdomain.com
+MAIL_PORT=587
+MAIL_USERNAME=noreply@yourdomain.com
+MAIL_PASSWORD=your_email_password
+MAIL_ENCRYPTION=tls
+MAIL_FROM_ADDRESS="noreply@yourdomain.com"
+MAIL_FROM_NAME="${APP_NAME}"
+```
+
+<Accordion title="Shared Hosting SMTP Settings">
+
+**cPanel Mail:**
+```env
+MAIL_HOST=mail.yourdomain.com
+MAIL_PORT=587
+MAIL_ENCRYPTION=tls
+```
+
+**Using Gmail:**
+```env
+MAIL_HOST=smtp.gmail.com
+MAIL_PORT=587
+MAIL_ENCRYPTION=tls
+MAIL_USERNAME=your-email@gmail.com
+MAIL_PASSWORD=your-app-specific-password
+```
+
+**Using Hosting SMTP:**
+Check your hosting control panel for SMTP server details.
+
+</Accordion>
+
+## Upload Files to Hosting
+
+<Steps>
+
+### Connect via FTP
+
+Connect to your hosting using an FTP client with credentials from your provider:
+
+- **Host:** ftp.yourdomain.com
+- **Username:** Your FTP username
+- **Password:** Your FTP password
+- **Port:** 21 (or 22 for SFTP)
+
+### Upload All Files
+
+Upload **all** files and folders from your local `health-manager` directory to your hosting:
+
+<Warning>
+**Important:** Upload everything, including:
+- `vendor/` folder (PHP dependencies)
+- `public/build/` folder (compiled assets)
+- `.env` file (your configuration)
+- Hidden files like `.htaccess`
+</Warning>
+
+**Upload to:**
+- If your domain points to a folder: Upload to that folder
+- If using a subdomain: Upload to the subdomain's directory
+- Default: Usually `public_html` or `www`
+
+### Upload Time
+
+Uploading may take 15-30 minutes depending on your connection speed. The `vendor` folder contains thousands of files.
+
+<Accordion title="Faster Upload Tips">
+
+1. **Use an archive:** Compress the project locally and extract on the server (if file manager supports it)
+2. **Use SFTP:** Often faster than regular FTP
+3. **Parallel transfers:** Configure your FTP client for multiple simultaneous transfers
+4. **Resume capability:** Use an FTP client that can resume interrupted transfers
+
+</Accordion>
+
+</Steps>
+
+## Configure Web Server
+
+<Warning>
+**Critical Security Step:** Your domain must point to the `/public` subdirectory, not the project root.
+</Warning>
+
+### Method 1: Using cPanel/Control Panel
+
+Most hosting control panels allow you to set the document root:
+
+<Steps>
+
+1. **cPanel:** Go to "Domains" → "Domains" → Click "Manage" next to your domain
+2. **Document Root:** Change from `/public_html` to `/public_html/public`
+3. **Save changes**
+
+</Steps>
+
+### Method 2: Using .htaccess (If public folder not configurable)
+
+If you can't change document root, create `.htaccess` in your project root:
+
+```apache .htaccess (Root Directory)
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>
+```
+
+<Warning>
+This method is less secure. Contact your hosting provider to properly configure document root.
+</Warning>
+
+### Verify .htaccess in Public
+
+Ensure the `.htaccess` file exists in the `public` directory:
+
+```apache public/.htaccess
+<IfModule mod_negotiation.c>
+    Options -MultiViews -Indexes
+</IfModule>
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Handle Authorization Header
+    RewriteCond %{HTTP:Authorization} .
+    RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+    # Redirect Trailing Slashes If Not A Folder...
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_URI} (.+)/$
+    RewriteRule ^ %1 [L,R=301]
+
+    # Send Requests To Front Controller...
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteRule ^ index.php [L]
+</IfModule>
+```
+
+## File Permissions
+
+### Set Permissions via FTP
+
+Set the following permissions (chmod):
+
+1. **storage/** directory: `775` (rwxrwxr-x)
+2. **bootstrap/cache/** directory: `775` (rwxrwxr-x)
+3. All subdirectories in storage: `775`
+4. All files in storage: `664` (rw-rw-r--)
+
+### Using cPanel File Manager
+
+<Steps>
+
+1. Navigate to your Health Manager directory
+2. Right-click `storage` folder → "Change Permissions"
+3. Set to `775` and check "Recurse into subdirectories"
+4. Repeat for `bootstrap/cache`
+
+</Steps>
+
+<Warning>
+If you encounter permission errors, some hosts require `777` for folders and `666` for files, but this is less secure.
+</Warning>
+
+## First Access & Admin Setup
+
+Health Manager features **automatic installation** on first access:
+
+<Steps>
+
+### Visit Your Domain
+
+Navigate to your domain in a web browser:
+
+```
+https://yourdomain.com
+```
+
+### Automatic Database Setup
+
+The application will:
+- Detect an empty database
+- Automatically create all necessary tables
+- Redirect you to the registration page
+
+### Register Admin User
+
+The **first user** to register becomes the administrator.
+
+<Warning>
+**Important:** Register immediately after deployment to secure admin access.
+</Warning>
+
+### Start Using the Application
+
+You now have full access to Health Manager with administrative privileges.
+
+</Steps>
+
+## Troubleshooting
+
+<Accordion title="500 Internal Server Error">
+
+**Check these common issues:**
+
+1. **File permissions:** Ensure `storage` and `bootstrap/cache` are writable (775)
+2. **Missing .env:** Verify `.env` file was uploaded
+3. **PHP version:** Confirm hosting uses PHP 8.4+
+4. **Check error logs:**
+   - cPanel: Error Log in Metrics section
+   - Or check `storage/logs/laravel.log` via FTP
+
+**Fix permissions via cPanel:**
+```
+storage folder: 775
+bootstrap/cache: 775
+```
+
+</Accordion>
+
+<Accordion title="Blank White Page">
+
+**Possible causes:**
+
+1. **PHP errors hidden:** Check error logs
+2. **Missing assets:** Verify `public/build` folder uploaded
+3. **Wrong document root:** Ensure domain points to `/public`
+4. **Composer dependencies:** Verify `vendor` folder uploaded completely
+
+**Enable error reporting temporarily:**
+
+In `.env`:
+```env
+APP_DEBUG=true
+```
+
+Check the error, then set back to `false`.
+
+</Accordion>
+
+<Accordion title="Database Connection Failed">
+
+**Troubleshooting steps:**
+
+1. **Verify credentials:** Double-check `.env` database settings
+2. **Database exists:** Ensure database created in cPanel
+3. **User permissions:** Database user must have all privileges
+4. **Remote access:** Some hosts use remote database servers
+5. **Host value:** Try both `localhost` and `127.0.0.1`
+
+**Test database connection:**
+
+Create `test-db.php` in public folder:
+```php
+<?php
+$conn = new mysqli('DB_HOST', 'DB_USER', 'DB_PASS', 'DB_NAME');
+if ($conn->connect_error) {
+    die("Connection failed: " . $conn->connect_error);
+}
+echo "Connected successfully";
+?>
+```
+
+Delete this file after testing.
+
+</Accordion>
+
+<Accordion title="Assets Not Loading (CSS/JS Missing)">
+
+**Solutions:**
+
+1. **Verify build folder:** Check `public/build` directory exists and contains files
+2. **Rebuild locally:**
+   ```bash
+   npm run build
+   ```
+   Then re-upload `public/build` folder
+
+3. **Check .htaccess:** Ensure `public/.htaccess` uploaded correctly
+4. **Clear browser cache:** Hard refresh (Ctrl+F5)
+5. **Verify APP_URL:** Must match your domain in `.env`
+
+</Accordion>
+
+<Accordion title="Upload Errors / Timeout">
+
+**File upload size limits:**
+
+1. **Increase PHP limits** via `.htaccess` in public folder:
+   ```apache
+   php_value upload_max_filesize 64M
+   php_value post_max_size 64M
+   php_value max_execution_time 300
+   php_value max_input_time 300
+   ```
+
+2. **Or via php.ini** (if your host allows):
+   ```ini
+   upload_max_filesize = 64M
+   post_max_size = 64M
+   max_execution_time = 300
+   ```
+
+3. **Contact hosting support** if limits can't be changed
+
+</Accordion>
+
+<Accordion title="Email Not Sending">
+
+**Common issues:**
+
+1. **Wrong SMTP settings:** Verify with hosting provider
+2. **Port blocked:** Try alternative ports (465, 2525)
+3. **Authentication required:** Ensure username/password correct
+4. **SPF/DKIM records:** May need DNS configuration
+5. **Test SMTP:** Use online SMTP testers
+
+**Alternative:** Use free email services like SendGrid, Mailgun, or Amazon SES
+
+</Accordion>
+
+## Updates
+
+To update Health Manager on shared hosting:
+
+<Steps>
+
+### Backup Current Installation
+
+1. Download entire site via FTP
+2. Export database via phpMyAdmin
+3. Save `.env` file separately
+
+### Prepare Update Locally
+
+```bash
+cd health-manager
+git pull origin main
+composer install --no-dev --optimize-autoloader
+npm install && npm run build
+```
+
+### Upload Updated Files
+
+1. Upload all files via FTP (overwrite existing)
+2. **Don't replace** `.env` file (keep your configuration)
+3. Verify `vendor` and `public/build` uploaded completely
+
+### Clear Cache
+
+If your host provides SSH, run:
+```bash
+php artisan config:cache
+php artisan route:cache
+php artisan view:cache
+```
+
+Otherwise, delete these files via FTP:
+- `bootstrap/cache/config.php`
+- `bootstrap/cache/routes-v7.php`
+
+</Steps>
+
+## Performance Tips
+
+### Enable OPcache
+
+If your hosting supports `php.ini` customization:
+
+```ini php.ini
+opcache.enable=1
+opcache.memory_consumption=128
+opcache.interned_strings_buffer=8
+opcache.max_accelerated_files=10000
+```
+
+### Enable Compression
+
+Add to `public/.htaccess`:
+
+```apache
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css text/javascript application/javascript
+</IfModule>
+```
+
+### Browser Caching
+
+Add to `public/.htaccess`:
+
+```apache
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType image/jpg "access plus 1 year"
+    ExpiresByType image/jpeg "access plus 1 year"
+    ExpiresByType image/gif "access plus 1 year"
+    ExpiresByType image/png "access plus 1 year"
+    ExpiresByType text/css "access plus 1 month"
+    ExpiresByType application/javascript "access plus 1 month"
+</IfModule>
+```
+
+## Security Best Practices
+
+1. **Use HTTPS:** Install SSL certificate (often free via Let's Encrypt in cPanel)
+2. **Strong passwords:** Use complex database and admin passwords
+3. **Regular backups:** Automate database and file backups
+4. **Update regularly:** Keep Health Manager updated
+5. **Monitor logs:** Check `storage/logs/laravel.log` periodically
+6. **Disable directory listing:** Ensure `.htaccess` prevents directory browsing
+
+## Next Steps
+
+- Configure SSL certificate for HTTPS
+- Set up automated database backups
+- Configure email notifications
+- Customize application settings
+- Create additional user accounts
+- Review and adjust file upload limits

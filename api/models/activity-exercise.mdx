@@ -1,0 +1,535 @@
+---
+title: 'ActivityExercise Model'
+description: 'Complete documentation for the ActivityExercise model for tracking physical activities and exercises'
+---
+
+## Overview
+
+The `ActivityExercise` model tracks physical activities and exercise sessions for users in Health Manager. It supports detailed exercise logging with duration tracking, descriptions, and file attachments through polymorphic relationships.
+
+### Namespace
+
+```php
+App\Models\ActivityExercise
+```
+
+### Class Declaration
+
+```php
+class ActivityExercise extends Model
+```
+
+## Database Schema
+
+The `activity_exercises` table includes the following columns:
+
+<ResponseField name="id" type="bigint" required>
+  Primary key, auto-incrementing
+</ResponseField>
+
+<ResponseField name="user_id" type="bigint" required>
+  Foreign key referencing users table (cascades on delete)
+</ResponseField>
+
+<ResponseField name="title" type="string" required>
+  Exercise or activity title
+</ResponseField>
+
+<ResponseField name="date" type="datetime" required>
+  Date and time when the activity was performed
+</ResponseField>
+
+<ResponseField name="description" type="text">
+  Optional detailed description of the activity
+</ResponseField>
+
+<ResponseField name="duration_minutes" type="integer">
+  Duration of the activity in minutes
+</ResponseField>
+
+<ResponseField name="file_path" type="string">
+  Legacy file path (deprecated - use attachments relationship instead)
+</ResponseField>
+
+<ResponseField name="created_at" type="timestamp">
+  Record creation timestamp
+</ResponseField>
+
+<ResponseField name="updated_at" type="timestamp">
+  Record last update timestamp
+</ResponseField>
+
+## Fillable Attributes
+
+These attributes can be mass assigned:
+
+<ParamField path="user_id" type="integer" required>
+  ID of the user who performed this activity
+</ParamField>
+
+<ParamField path="title" type="string" required>
+  Activity title (e.g., "Morning Run", "Gym Workout", "Yoga Session")
+</ParamField>
+
+<ParamField path="date" type="datetime" required>
+  Date and time of the activity in Y-m-d H:i:s format
+</ParamField>
+
+<ParamField path="description" type="string">
+  Detailed description, notes, or workout details
+</ParamField>
+
+<ParamField path="duration_minutes" type="integer">
+  Duration in minutes (e.g., 30, 45, 60)
+</ParamField>
+
+<ParamField path="file_path" type="string">
+  Legacy field for single file attachment (use attachments relationship for multiple files)
+</ParamField>
+
+## Casts
+
+```php
+[
+    'date' => 'datetime',
+]
+```
+
+The `date` attribute is automatically cast to a Carbon datetime instance.
+
+## Relationships
+
+### user()
+
+Belongs to relationship with the User model.
+
+<Expandable title="Relationship Details">
+  <ResponseField name="type" type="BelongsTo">
+    One-to-many inverse relationship
+  </ResponseField>
+  
+  <ResponseField name="related" type="User">
+    Related to User model
+  </ResponseField>
+  
+  <ResponseField name="foreignKey" type="user_id">
+    Foreign key on activity_exercises table
+  </ResponseField>
+</Expandable>
+
+```php
+public function user(): BelongsTo
+{
+    return $this->belongsTo(User::class);
+}
+```
+
+**Example Usage:**
+
+```php
+$activity = ActivityExercise::find(1);
+$userName = $activity->user->name;
+```
+
+### attachments()
+
+Polymorphic relationship for file attachments (e.g., workout photos, GPS tracks, screenshots).
+
+<Expandable title="Relationship Details">
+  <ResponseField name="type" type="MorphMany">
+    One-to-many polymorphic relationship
+  </ResponseField>
+  
+  <ResponseField name="related" type="Attachment">
+    Related to Attachment model
+  </ResponseField>
+  
+  <ResponseField name="morphName" type="model">
+    Polymorphic relationship name
+  </ResponseField>
+  
+  <ResponseField name="morphType" type="model_type">
+    Stores 'App\\Models\\ActivityExercise'
+  </ResponseField>
+  
+  <ResponseField name="morphId" type="model_id">
+    Stores the activity ID
+  </ResponseField>
+</Expandable>
+
+```php
+public function attachments(): MorphMany
+{
+    return $this->morphMany(Attachment::class, 'model');
+}
+```
+
+**Example Usage:**
+
+```php
+$activity = ActivityExercise::find(1);
+
+// Get all attachments
+$files = $activity->attachments;
+
+// Add new attachment
+$activity->attachments()->create([
+    'file_path' => 'activities/workout-photo.jpg',
+    'file_name' => 'workout-photo.jpg',
+]);
+```
+
+## Usage Examples
+
+### Creating Exercise Activities
+
+```php
+use App\Models\ActivityExercise;
+use Carbon\Carbon;
+
+// Create a simple activity
+$activity = ActivityExercise::create([
+    'user_id' => auth()->id(),
+    'title' => 'Morning Run',
+    'date' => now(),
+    'duration_minutes' => 30,
+    'description' => '5K run in the park',
+]);
+
+echo "Activity logged: {$activity->title} - {$activity->duration_minutes} minutes";
+```
+
+### Creating Activity with Attachments
+
+```php
+$activity = ActivityExercise::create([
+    'user_id' => auth()->id(),
+    'title' => 'HIIT Workout',
+    'date' => Carbon::parse('2026-03-05 18:00:00'),
+    'duration_minutes' => 45,
+    'description' => '4 rounds: burpees, squats, push-ups, mountain climbers',
+]);
+
+// Add workout photos
+$activity->attachments()->createMany([
+    [
+        'file_path' => 'storage/activities/before-workout.jpg',
+        'file_name' => 'Before Workout.jpg',
+    ],
+    [
+        'file_path' => 'storage/activities/after-workout.jpg',
+        'file_name' => 'After Workout.jpg',
+    ],
+]);
+```
+
+### Querying Activities
+
+```php
+// Get all activities for current user
+$allActivities = ActivityExercise::where('user_id', auth()->id())
+    ->orderBy('date', 'desc')
+    ->get();
+
+// Get recent activities
+$recent = ActivityExercise::where('user_id', auth()->id())
+    ->where('date', '>=', now()->subDays(7))
+    ->orderBy('date', 'desc')
+    ->get();
+
+// Get activities with attachments
+$withFiles = ActivityExercise::with('attachments')
+    ->where('user_id', auth()->id())
+    ->get();
+
+// Get activities for specific date range
+$marchActivities = ActivityExercise::where('user_id', auth()->id())
+    ->whereBetween('date', [
+        Carbon::parse('2026-03-01'),
+        Carbon::parse('2026-03-31')
+    ])
+    ->orderBy('date', 'asc')
+    ->get();
+```
+
+### Calculating Activity Statistics
+
+```php
+// Total exercise time this month
+$totalMinutes = ActivityExercise::where('user_id', auth()->id())
+    ->whereMonth('date', now()->month)
+    ->sum('duration_minutes');
+
+echo "Total exercise time: {$totalMinutes} minutes (" . round($totalMinutes / 60, 1) . " hours)";
+
+// Average duration
+$avgDuration = ActivityExercise::where('user_id', auth()->id())
+    ->avg('duration_minutes');
+
+echo "Average workout duration: " . round($avgDuration) . " minutes";
+
+// Activity count by period
+$thisWeek = ActivityExercise::where('user_id', auth()->id())
+    ->whereBetween('date', [now()->startOfWeek(), now()->endOfWeek()])
+    ->count();
+
+$thisMonth = ActivityExercise::where('user_id', auth()->id())
+    ->whereMonth('date', now()->month)
+    ->count();
+
+echo "Activities: {$thisWeek} this week, {$thisMonth} this month";
+```
+
+### Filtering by Activity Type
+
+```php
+// Find running activities
+$runs = ActivityExercise::where('user_id', auth()->id())
+    ->where('title', 'like', '%run%')
+    ->orderBy('date', 'desc')
+    ->get();
+
+// Find gym workouts
+$gymWorkouts = ActivityExercise::where('user_id', auth()->id())
+    ->where('title', 'like', '%gym%')
+    ->orWhere('title', 'like', '%workout%')
+    ->orderBy('date', 'desc')
+    ->get();
+
+// Find activities by minimum duration
+$longWorkouts = ActivityExercise::where('user_id', auth()->id())
+    ->where('duration_minutes', '>=', 60)
+    ->orderBy('duration_minutes', 'desc')
+    ->get();
+```
+
+### Updating Activities
+
+```php
+$activity = ActivityExercise::find(1);
+
+$activity->update([
+    'title' => 'Evening Run - Updated',
+    'duration_minutes' => 35,
+    'description' => 'Extended the route by 1K',
+]);
+```
+
+### Filtering by Date
+
+```php
+use Carbon\Carbon;
+
+// Today's activities
+$today = ActivityExercise::whereDate('date', today())
+    ->where('user_id', auth()->id())
+    ->get();
+
+// This week's activities
+$thisWeek = ActivityExercise::whereBetween('date', [
+        now()->startOfWeek(),
+        now()->endOfWeek()
+    ])
+    ->where('user_id', auth()->id())
+    ->get();
+
+// Last 30 days
+$last30Days = ActivityExercise::where('user_id', auth()->id())
+    ->where('date', '>=', now()->subDays(30))
+    ->orderBy('date', 'desc')
+    ->get();
+```
+
+### Activity Streaks
+
+```php
+// Calculate current streak
+function calculateStreak($userId)
+{
+    $activities = ActivityExercise::where('user_id', $userId)
+        ->whereDate('date', '>=', now()->subDays(90))
+        ->orderBy('date', 'desc')
+        ->get()
+        ->groupBy(function ($activity) {
+            return $activity->date->format('Y-m-d');
+        });
+
+    $streak = 0;
+    $currentDate = now();
+
+    while ($activities->has($currentDate->format('Y-m-d'))) {
+        $streak++;
+        $currentDate->subDay();
+    }
+
+    return $streak;
+}
+
+$streak = calculateStreak(auth()->id());
+echo "Current streak: {$streak} days";
+```
+
+### Working with Relationships
+
+```php
+// Eager load relationships
+$activities = ActivityExercise::with(['user', 'attachments'])
+    ->where('date', '>=', now()->subDays(7))
+    ->get();
+
+foreach ($activities as $activity) {
+    echo "{$activity->user->name}: {$activity->title} - {$activity->duration_minutes} min\n";
+    echo "Attachments: {$activity->attachments->count()}\n";
+}
+```
+
+### Charting Activity Data
+
+```php
+// Get weekly activity data for chart
+$weeklyData = [];
+
+for ($i = 6; $i >= 0; $i--) {
+    $date = now()->subDays($i);
+    $totalMinutes = ActivityExercise::where('user_id', auth()->id())
+        ->whereDate('date', $date)
+        ->sum('duration_minutes');
+
+    $weeklyData[] = [
+        'date' => $date->format('Y-m-d'),
+        'day' => $date->format('l'),
+        'minutes' => $totalMinutes,
+    ];
+}
+
+return response()->json($weeklyData);
+```
+
+### Deleting Activities
+
+```php
+$activity = ActivityExercise::find(1);
+
+// Delete activity with attachments
+$activity->attachments()->delete();
+$activity->delete();
+
+// Delete old activities (e.g., older than 2 years)
+ActivityExercise::where('user_id', auth()->id())
+    ->where('date', '<', now()->subYears(2))
+    ->delete();
+```
+
+## JSON Serialization Example
+
+```php
+$activity = ActivityExercise::with(['user', 'attachments'])->find(1);
+
+return response()->json($activity);
+```
+
+**Output:**
+
+```json
+{
+  "id": 1,
+  "user_id": 5,
+  "title": "Morning Run",
+  "date": "2026-03-05T07:00:00.000000Z",
+  "description": "5K run in the park",
+  "duration_minutes": 30,
+  "file_path": null,
+  "created_at": "2026-03-05T07:30:00.000000Z",
+  "updated_at": "2026-03-05T07:30:00.000000Z",
+  "user": {
+    "id": 5,
+    "name": "John Doe",
+    "email": "john@example.com",
+    "username": "johndoe"
+  },
+  "attachments": [
+    {
+      "id": 1,
+      "model_type": "App\\Models\\ActivityExercise",
+      "model_id": 1,
+      "file_path": "storage/activities/workout-photo.jpg",
+      "file_name": "Workout Photo.jpg",
+      "created_at": "2026-03-05T07:31:00.000000Z",
+      "updated_at": "2026-03-05T07:31:00.000000Z"
+    }
+  ]
+}
+```
+
+## API Response Example for Activity Dashboard
+
+```php
+// Controller method to get activity summary
+public function getActivitySummary()
+{
+    $userId = auth()->id();
+    
+    $thisWeek = ActivityExercise::where('user_id', $userId)
+        ->whereBetween('date', [now()->startOfWeek(), now()->endOfWeek()])
+        ->get();
+
+    $thisMonth = ActivityExercise::where('user_id', $userId)
+        ->whereMonth('date', now()->month)
+        ->get();
+
+    return response()->json([
+        'this_week' => [
+            'count' => $thisWeek->count(),
+            'total_minutes' => $thisWeek->sum('duration_minutes'),
+        ],
+        'this_month' => [
+            'count' => $thisMonth->count(),
+            'total_minutes' => $thisMonth->sum('duration_minutes'),
+        ],
+        'recent_activities' => ActivityExercise::where('user_id', $userId)
+            ->orderBy('date', 'desc')
+            ->limit(5)
+            ->get(),
+    ]);
+}
+```
+
+**Response:**
+
+```json
+{
+  "this_week": {
+    "count": 4,
+    "total_minutes": 180
+  },
+  "this_month": {
+    "count": 12,
+    "total_minutes": 540
+  },
+  "recent_activities": [
+    {
+      "id": 1,
+      "user_id": 5,
+      "title": "Morning Run",
+      "date": "2026-03-05T07:00:00.000000Z",
+      "duration_minutes": 30
+    },
+    {
+      "id": 2,
+      "user_id": 5,
+      "title": "Gym Workout",
+      "date": "2026-03-04T18:00:00.000000Z",
+      "duration_minutes": 60
+    }
+  ]
+}
+```
+
+## Traits Used
+
+- `HasFactory` - Enables model factories for testing and seeding
+
+## Related Models
+
+- [User](/api/models/user)
+- [MedicalAppointment](/api/models/medical-appointment)

@@ -1,0 +1,375 @@
+---
+title: 'MeasurementWeight Model'
+description: 'Complete documentation for the MeasurementWeight model for tracking body weight measurements'
+---
+
+## Overview
+
+The `MeasurementWeight` model tracks body weight measurements over time for users in Health Manager. It provides weight tracking with date-based organization and belongs to a user.
+
+### Namespace
+
+```php
+App\Models\MeasurementWeight
+```
+
+### Class Declaration
+
+```php
+class MeasurementWeight extends Model
+```
+
+## Database Schema
+
+The `measurement_weights` table includes the following columns:
+
+<ResponseField name="id" type="bigint" required>
+  Primary key, auto-incrementing
+</ResponseField>
+
+<ResponseField name="user_id" type="bigint" required>
+  Foreign key referencing users table (cascades on delete)
+</ResponseField>
+
+<ResponseField name="date" type="datetime" required>
+  Date and time when the weight was measured
+</ResponseField>
+
+<ResponseField name="weight" type="decimal(5,2)" required>
+  Weight value in kilograms (e.g., 75.50)
+</ResponseField>
+
+<ResponseField name="created_at" type="timestamp">
+  Record creation timestamp
+</ResponseField>
+
+<ResponseField name="updated_at" type="timestamp">
+  Record last update timestamp
+</ResponseField>
+
+## Guarded Attributes
+
+This model uses `$guarded = []`, meaning all attributes are mass assignable:
+
+<ParamField path="user_id" type="integer" required>
+  ID of the user who owns this measurement
+</ParamField>
+
+<ParamField path="date" type="datetime" required>
+  Date and time of the measurement in Y-m-d H:i:s format
+</ParamField>
+
+<ParamField path="weight" type="decimal" required>
+  Weight value in kilograms (supports 2 decimal places)
+</ParamField>
+
+## Casts
+
+```php
+[
+    'date' => 'datetime',
+    'weight' => 'decimal:2',
+]
+```
+
+- `date` is automatically cast to a Carbon datetime instance
+- `weight` is cast to a decimal with 2 decimal places
+
+## Relationships
+
+### user()
+
+Belongs to relationship with the User model.
+
+<Expandable title="Relationship Details">
+  <ResponseField name="type" type="BelongsTo">
+    One-to-many inverse relationship
+  </ResponseField>
+  
+  <ResponseField name="related" type="User">
+    Related to User model
+  </ResponseField>
+  
+  <ResponseField name="foreignKey" type="user_id">
+    Foreign key on measurement_weights table
+  </ResponseField>
+</Expandable>
+
+```php
+public function user(): BelongsTo
+{
+    return $this->belongsTo(User::class);
+}
+```
+
+**Example Usage:**
+
+```php
+$measurement = MeasurementWeight::find(1);
+$userName = $measurement->user->name;
+```
+
+## Usage Examples
+
+### Creating Weight Measurements
+
+```php
+use App\Models\MeasurementWeight;
+use Carbon\Carbon;
+
+// Create a single measurement
+$measurement = MeasurementWeight::create([
+    'user_id' => auth()->id(),
+    'date' => now(),
+    'weight' => 75.5,
+]);
+
+echo "Weight recorded: {$measurement->weight} kg";
+```
+
+### Bulk Creating Measurements
+
+```php
+// Insert multiple weight measurements
+$measurements = [
+    [
+        'user_id' => auth()->id(),
+        'date' => Carbon::parse('2026-01-01 08:00:00'),
+        'weight' => 78.2,
+    ],
+    [
+        'user_id' => auth()->id(),
+        'date' => Carbon::parse('2026-01-08 08:00:00'),
+        'weight' => 77.8,
+    ],
+    [
+        'user_id' => auth()->id(),
+        'date' => Carbon::parse('2026-01-15 08:00:00'),
+        'weight' => 77.1,
+    ],
+];
+
+MeasurementWeight::insert($measurements);
+```
+
+### Querying Weight Data
+
+```php
+// Get all measurements for current user
+$allWeights = MeasurementWeight::where('user_id', auth()->id())
+    ->orderBy('date', 'desc')
+    ->get();
+
+// Get latest weight
+$latestWeight = MeasurementWeight::where('user_id', auth()->id())
+    ->latest('date')
+    ->first();
+
+echo "Current weight: {$latestWeight->weight} kg";
+
+// Get measurements for specific date range
+$januaryWeights = MeasurementWeight::where('user_id', auth()->id())
+    ->whereBetween('date', [
+        Carbon::parse('2026-01-01'),
+        Carbon::parse('2026-01-31')
+    ])
+    ->orderBy('date', 'asc')
+    ->get();
+```
+
+### Calculating Weight Statistics
+
+```php
+// Calculate average weight
+$avgWeight = MeasurementWeight::where('user_id', auth()->id())
+    ->avg('weight');
+
+echo "Average weight: " . round($avgWeight, 2) . " kg";
+
+// Get min and max weight
+$minWeight = MeasurementWeight::where('user_id', auth()->id())
+    ->min('weight');
+
+$maxWeight = MeasurementWeight::where('user_id', auth()->id())
+    ->max('weight');
+
+echo "Weight range: {$minWeight} - {$maxWeight} kg";
+
+// Calculate weight change
+$firstWeight = MeasurementWeight::where('user_id', auth()->id())
+    ->oldest('date')
+    ->first();
+
+$latestWeight = MeasurementWeight::where('user_id', auth()->id())
+    ->latest('date')
+    ->first();
+
+if ($firstWeight && $latestWeight) {
+    $change = $latestWeight->weight - $firstWeight->weight;
+    $changePercent = ($change / $firstWeight->weight) * 100;
+    
+    echo "Total change: {$change} kg (" . round($changePercent, 1) . "%)";
+}
+```
+
+### Updating Measurements
+
+```php
+$measurement = MeasurementWeight::find(1);
+
+$measurement->update([
+    'weight' => 76.3,
+    'date' => Carbon::parse('2026-03-05 09:00:00'),
+]);
+```
+
+### Filtering by Date
+
+```php
+use Carbon\Carbon;
+
+// Today's measurements
+$today = MeasurementWeight::whereDate('date', today())
+    ->where('user_id', auth()->id())
+    ->get();
+
+// This week's measurements
+$thisWeek = MeasurementWeight::whereBetween('date', [
+        now()->startOfWeek(),
+        now()->endOfWeek()
+    ])
+    ->where('user_id', auth()->id())
+    ->get();
+
+// Last 30 days
+$last30Days = MeasurementWeight::where('user_id', auth()->id())
+    ->where('date', '>=', now()->subDays(30))
+    ->orderBy('date', 'asc')
+    ->get();
+```
+
+### Charting Weight Over Time
+
+```php
+// Get weight data for chart
+$chartData = MeasurementWeight::where('user_id', auth()->id())
+    ->where('date', '>=', now()->subDays(90))
+    ->orderBy('date', 'asc')
+    ->get()
+    ->map(function ($measurement) {
+        return [
+            'date' => $measurement->date->format('Y-m-d'),
+            'weight' => (float) $measurement->weight,
+        ];
+    });
+
+return response()->json($chartData);
+```
+
+### Working with User Relationship
+
+```php
+// Eager load user data
+$measurements = MeasurementWeight::with('user')
+    ->where('date', '>=', now()->subDays(7))
+    ->get();
+
+foreach ($measurements as $measurement) {
+    echo "{$measurement->user->name}: {$measurement->weight} kg on {$measurement->date->format('M d, Y')}\n";
+}
+```
+
+### Deleting Measurements
+
+```php
+$measurement = MeasurementWeight::find(1);
+$measurement->delete();
+
+// Delete old measurements (e.g., older than 2 years)
+MeasurementWeight::where('user_id', auth()->id())
+    ->where('date', '<', now()->subYears(2))
+    ->delete();
+```
+
+## JSON Serialization Example
+
+```php
+$measurement = MeasurementWeight::with('user')->find(1);
+
+return response()->json($measurement);
+```
+
+**Output:**
+
+```json
+{
+  "id": 1,
+  "user_id": 5,
+  "date": "2026-03-05T08:00:00.000000Z",
+  "weight": "75.50",
+  "created_at": "2026-03-05T08:30:00.000000Z",
+  "updated_at": "2026-03-05T08:30:00.000000Z",
+  "user": {
+    "id": 5,
+    "name": "John Doe",
+    "email": "john@example.com",
+    "username": "johndoe"
+  }
+}
+```
+
+## API Response Example for Weight Tracking
+
+```php
+// Controller method to get weight progress
+public function getWeightProgress()
+{
+    $measurements = MeasurementWeight::where('user_id', auth()->id())
+        ->where('date', '>=', now()->subDays(30))
+        ->orderBy('date', 'asc')
+        ->get();
+
+    $latest = $measurements->last();
+    $first = $measurements->first();
+
+    return response()->json([
+        'current_weight' => $latest ? $latest->weight : null,
+        'weight_change' => ($latest && $first) ? ($latest->weight - $first->weight) : 0,
+        'measurements' => $measurements,
+        'count' => $measurements->count(),
+    ]);
+}
+```
+
+**Response:**
+
+```json
+{
+  "current_weight": "75.50",
+  "weight_change": "-2.70",
+  "measurements": [
+    {
+      "id": 1,
+      "user_id": 5,
+      "date": "2026-02-05T08:00:00.000000Z",
+      "weight": "78.20"
+    },
+    {
+      "id": 2,
+      "user_id": 5,
+      "date": "2026-03-05T08:00:00.000000Z",
+      "weight": "75.50"
+    }
+  ],
+  "count": 2
+}
+```
+
+## Traits Used
+
+- `HasFactory` - Enables model factories for testing and seeding
+
+## Related Models
+
+- [User](/api/models/user)
+- [MeasurementHeart](/api/models/measurement-heart)

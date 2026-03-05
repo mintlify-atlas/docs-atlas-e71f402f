@@ -1,0 +1,597 @@
+---
+title: 'Configuration Guide'
+description: 'Complete guide to configuring Health Manager environment variables and settings'
+---
+
+## Overview
+
+Health Manager uses environment variables stored in the `.env` file for configuration. This guide covers all available configuration options organized by category.
+
+<Warning>
+  Never commit your `.env` file to version control. It contains sensitive credentials and should be kept secure.
+</Warning>
+
+## Application Settings
+
+Configure basic application settings:
+
+### Application Name
+
+```env
+APP_NAME="Health Manager"
+```
+
+The application name appears in:
+- Email notifications
+- Browser page titles
+- Application header
+
+### Environment Mode
+
+```env
+APP_ENV=production
+APP_DEBUG=false
+```
+
+<CodeGroup>
+  ```env Production
+  APP_ENV=production
+  APP_DEBUG=false
+  ```
+
+  ```env Development
+  APP_ENV=local
+  APP_DEBUG=true
+  ```
+
+  ```env Staging
+  APP_ENV=staging
+  APP_DEBUG=false
+  ```
+</CodeGroup>
+
+<Warning>
+  **Never enable `APP_DEBUG=true` in production!** Debug mode exposes sensitive information about your application and server configuration.
+</Warning>
+
+### Application Key
+
+```env
+APP_KEY=base64:your-generated-key-here
+```
+
+<Note>
+  The application key is automatically generated when you run `php artisan key:generate`. This key is used for encrypting sessions and other sensitive data.
+</Note>
+
+### Application URL
+
+```env
+APP_URL=https://yourdomain.com
+```
+
+Set this to your actual domain URL. This is used for:
+- Generating links in emails
+- Asset URL generation
+- CSRF token validation
+
+### Localization
+
+```env
+APP_LOCALE=en
+APP_FALLBACK_LOCALE=en
+APP_FAKER_LOCALE=en_US
+```
+
+Available locales:
+- `en` - English
+- `es` - Spanish (default in source)
+- Other locales can be added via Laravel's localization system
+
+### Security
+
+```env
+BCRYPT_ROUNDS=12
+```
+
+Password hashing rounds. Higher values = more secure but slower:
+- **10:** Fast, minimum recommended
+- **12:** Balanced (default)
+- **14+:** More secure, slower performance
+
+## Database Configuration
+
+Health Manager supports multiple database systems.
+
+### SQLite (Default)
+
+<Note>
+  SQLite is ideal for small deployments and doesn't require a separate database server.
+</Note>
+
+```env
+DB_CONNECTION=sqlite
+```
+
+For SQLite, ensure the `database/database.sqlite` file exists:
+
+```bash
+touch database/database.sqlite
+```
+
+### MySQL / MariaDB
+
+<CodeGroup>
+  ```env MySQL/MariaDB
+  DB_CONNECTION=mysql
+  DB_HOST=127.0.0.1
+  DB_PORT=3306
+  DB_DATABASE=health_manager
+  DB_USERNAME=your_username
+  DB_PASSWORD=your_password
+  ```
+
+  ```env Remote MySQL
+  DB_CONNECTION=mysql
+  DB_HOST=db.example.com
+  DB_PORT=3306
+  DB_DATABASE=health_manager
+  DB_USERNAME=your_username
+  DB_PASSWORD=your_password
+  ```
+</CodeGroup>
+
+### PostgreSQL
+
+```env
+DB_CONNECTION=pgsql
+DB_HOST=127.0.0.1
+DB_PORT=5432
+DB_DATABASE=health_manager
+DB_USERNAME=your_username
+DB_PASSWORD=your_password
+```
+
+<Note>
+  The database must already exist. Health Manager will create the tables automatically on first access.
+</Note>
+
+## Mail Configuration
+
+Mail configuration is **required** for:
+- Password reset emails
+- Notification emails
+- User invitation emails
+
+### SMTP Configuration
+
+<CodeGroup>
+  ```env Generic SMTP
+  MAIL_MAILER=smtp
+  MAIL_HOST=smtp.example.com
+  MAIL_PORT=587
+  MAIL_USERNAME=your_email@example.com
+  MAIL_PASSWORD=your_password
+  MAIL_ENCRYPTION=tls
+  MAIL_FROM_ADDRESS="no-reply@example.com"
+  MAIL_FROM_NAME="${APP_NAME}"
+  ```
+
+  ```env Gmail SMTP
+  MAIL_MAILER=smtp
+  MAIL_HOST=smtp.gmail.com
+  MAIL_PORT=587
+  MAIL_USERNAME=your_email@gmail.com
+  MAIL_PASSWORD=your_app_password
+  MAIL_ENCRYPTION=tls
+  MAIL_FROM_ADDRESS="your_email@gmail.com"
+  MAIL_FROM_NAME="${APP_NAME}"
+  ```
+
+  ```env SendGrid
+  MAIL_MAILER=smtp
+  MAIL_HOST=smtp.sendgrid.net
+  MAIL_PORT=587
+  MAIL_USERNAME=apikey
+  MAIL_PASSWORD=your_sendgrid_api_key
+  MAIL_ENCRYPTION=tls
+  MAIL_FROM_ADDRESS="no-reply@example.com"
+  MAIL_FROM_NAME="${APP_NAME}"
+  ```
+
+  ```env Mailgun
+  MAIL_MAILER=smtp
+  MAIL_HOST=smtp.mailgun.org
+  MAIL_PORT=587
+  MAIL_USERNAME=your_mailgun_smtp_username
+  MAIL_PASSWORD=your_mailgun_smtp_password
+  MAIL_ENCRYPTION=tls
+  MAIL_FROM_ADDRESS="no-reply@example.com"
+  MAIL_FROM_NAME="${APP_NAME}"
+  ```
+</CodeGroup>
+
+### Mail Encryption Options
+
+- **TLS (Port 587):** Recommended for most providers
+- **SSL (Port 465):** Alternative for some providers
+- **None (Port 25):** Not recommended, unencrypted
+
+```env
+MAIL_ENCRYPTION=tls  # or 'ssl' or null
+```
+
+### Development Mail Settings
+
+<Note>
+  For local development, you can use `log` to write emails to the log file instead of sending them:
+</Note>
+
+```env
+MAIL_MAILER=log
+```
+
+## Session Configuration
+
+```env
+SESSION_DRIVER=database
+SESSION_LIFETIME=120
+SESSION_ENCRYPT=false
+SESSION_PATH=/
+SESSION_DOMAIN=null
+```
+
+### Session Driver Options
+
+- **database:** Store sessions in database (recommended for production)
+- **file:** Store sessions in files
+- **cookie:** Store sessions in encrypted cookies
+- **redis:** Store sessions in Redis (requires Redis configuration)
+
+### Session Lifetime
+
+```env
+SESSION_LIFETIME=120  # minutes
+```
+
+Set how long users stay logged in:
+- **120:** 2 hours (default)
+- **1440:** 24 hours
+- **10080:** 1 week
+
+## Cache Configuration
+
+```env
+CACHE_STORE=database
+```
+
+Available cache drivers:
+- **database:** Store cache in database
+- **file:** Store cache in files
+- **redis:** Use Redis (requires Redis setup)
+- **memcached:** Use Memcached (requires Memcached setup)
+
+## Queue Configuration
+
+```env
+QUEUE_CONNECTION=database
+```
+
+<Note>
+  Queues handle background jobs like sending emails. The `database` driver stores jobs in the database.
+</Note>
+
+To process queued jobs, run:
+
+```bash
+php artisan queue:work
+```
+
+For production, set up a supervisor to keep the queue worker running:
+
+```ini [supervisor]
+[program:health-manager-worker]
+process_name=%(program_name)s_%(process_num)02d
+command=php /path/to/health-manager/artisan queue:work --sleep=3 --tries=3
+autostart=true
+autorestart=true
+user=www-data
+numprocs=1
+redirect_stderr=true
+stdout_logfile=/path/to/health-manager/storage/logs/worker.log
+```
+
+## Storage Configuration
+
+```env
+FILESYSTEM_DISK=local
+```
+
+Storage options:
+- **local:** Store files in `storage/app` directory
+- **public:** Store files in `storage/app/public` with public access
+- **s3:** Use Amazon S3 (requires AWS configuration)
+
+### AWS S3 Configuration (Optional)
+
+If you want to store medical documents in S3:
+
+```env
+FILESYSTEM_DISK=s3
+AWS_ACCESS_KEY_ID=your_access_key
+AWS_SECRET_ACCESS_KEY=your_secret_key
+AWS_DEFAULT_REGION=us-east-1
+AWS_BUCKET=your_bucket_name
+AWS_USE_PATH_STYLE_ENDPOINT=false
+```
+
+## Logging Configuration
+
+```env
+LOG_CHANNEL=stack
+LOG_STACK=single
+LOG_DEPRECATIONS_CHANNEL=null
+LOG_LEVEL=debug
+```
+
+### Log Levels
+
+<CodeGroup>
+  ```env Production
+  LOG_LEVEL=error  # Only log errors
+  ```
+
+  ```env Staging
+  LOG_LEVEL=warning  # Log warnings and errors
+  ```
+
+  ```env Development
+  LOG_LEVEL=debug  # Log everything
+  ```
+</CodeGroup>
+
+Available log levels (least to most verbose):
+- `emergency`
+- `alert`
+- `critical`
+- `error`
+- `warning`
+- `notice`
+- `info`
+- `debug`
+
+## Maintenance Mode
+
+```env
+APP_MAINTENANCE_DRIVER=file
+```
+
+To enable maintenance mode:
+
+```bash
+php artisan down
+```
+
+To disable:
+
+```bash
+php artisan up
+```
+
+## Redis Configuration (Optional)
+
+If using Redis for caching or queues:
+
+```env
+REDIS_CLIENT=phpredis
+REDIS_HOST=127.0.0.1
+REDIS_PASSWORD=null
+REDIS_PORT=6379
+```
+
+## Complete Example Configuration
+
+<Accordion title="View Complete Production .env Example">
+  ```env
+  # Application
+  APP_NAME="Health Manager"
+  APP_ENV=production
+  APP_KEY=base64:your-generated-key-here
+  APP_DEBUG=false
+  APP_URL=https://health.example.com
+
+  # Localization
+  APP_LOCALE=en
+  APP_FALLBACK_LOCALE=en
+  APP_FAKER_LOCALE=en_US
+
+  # Security
+  BCRYPT_ROUNDS=12
+
+  # Logging
+  LOG_CHANNEL=stack
+  LOG_STACK=single
+  LOG_DEPRECATIONS_CHANNEL=null
+  LOG_LEVEL=error
+
+  # Database
+  DB_CONNECTION=mysql
+  DB_HOST=localhost
+  DB_PORT=3306
+  DB_DATABASE=health_manager
+  DB_USERNAME=db_user
+  DB_PASSWORD=secure_password_here
+
+  # Session
+  SESSION_DRIVER=database
+  SESSION_LIFETIME=120
+  SESSION_ENCRYPT=false
+  SESSION_PATH=/
+  SESSION_DOMAIN=null
+
+  # Cache & Queue
+  CACHE_STORE=database
+  QUEUE_CONNECTION=database
+
+  # Storage
+  FILESYSTEM_DISK=local
+
+  # Mail
+  MAIL_MAILER=smtp
+  MAIL_HOST=smtp.example.com
+  MAIL_PORT=587
+  MAIL_USERNAME=noreply@health.example.com
+  MAIL_PASSWORD=mail_password_here
+  MAIL_ENCRYPTION=tls
+  MAIL_FROM_ADDRESS="noreply@health.example.com"
+  MAIL_FROM_NAME="${APP_NAME}"
+
+  # Broadcasting
+  BROADCAST_CONNECTION=log
+  ```
+</Accordion>
+
+## Environment-Specific Configurations
+
+<Tabs>
+  <Tab title="Production">
+    ```env
+    APP_ENV=production
+    APP_DEBUG=false
+    APP_URL=https://yourdomain.com
+    LOG_LEVEL=error
+    MAIL_MAILER=smtp
+    ```
+
+    <Warning>
+      Always ensure `APP_DEBUG=false` in production to prevent exposing sensitive information.
+    </Warning>
+  </Tab>
+
+  <Tab title="Staging">
+    ```env
+    APP_ENV=staging
+    APP_DEBUG=false
+    APP_URL=https://staging.yourdomain.com
+    LOG_LEVEL=warning
+    MAIL_MAILER=log
+    ```
+
+    <Note>
+      Staging should mirror production settings but can use `log` mail driver to avoid sending real emails.
+    </Note>
+  </Tab>
+
+  <Tab title="Development">
+    ```env
+    APP_ENV=local
+    APP_DEBUG=true
+    APP_URL=http://localhost
+    LOG_LEVEL=debug
+    MAIL_MAILER=log
+    DB_CONNECTION=sqlite
+    ```
+
+    <Note>
+      Development can use SQLite for simplicity and `log` mailer to avoid email configuration.
+    </Note>
+  </Tab>
+</Tabs>
+
+## Applying Configuration Changes
+
+After modifying the `.env` file:
+
+<Steps>
+  <Step title="Save the .env File">
+    Ensure all changes are saved.
+  </Step>
+
+  <Step title="Clear Configuration Cache">
+    If you've cached your configuration, clear it:
+
+    ```bash
+    php artisan config:clear
+    ```
+  </Step>
+
+  <Step title="Restart Services">
+    Restart your web server and queue workers:
+
+    ```bash
+    # Restart queue workers
+    php artisan queue:restart
+    
+    # Restart web server (example for nginx)
+    sudo systemctl restart nginx
+    ```
+  </Step>
+
+  <Step title="Verify Changes">
+    Test your application to ensure the new configuration is working correctly.
+  </Step>
+</Steps>
+
+## Security Best Practices
+
+<Warning>
+  Follow these security guidelines for production environments:
+</Warning>
+
+- **Never commit `.env` to version control** - Add it to `.gitignore`
+- **Use strong passwords** - For database and mail credentials
+- **Enable HTTPS** - Set `APP_URL` to use `https://`
+- **Disable debug mode** - Set `APP_DEBUG=false`
+- **Restrict file permissions** - Ensure `.env` is not publicly readable:
+  ```bash
+  chmod 600 .env
+  ```
+- **Use environment-specific keys** - Generate new `APP_KEY` for each environment
+- **Rotate credentials regularly** - Update passwords periodically
+- **Use app-specific passwords** - For email services like Gmail
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Configuration Not Taking Effect">
+    Clear the configuration cache:
+    ```bash
+    php artisan config:clear
+    php artisan cache:clear
+    ```
+  </Accordion>
+
+  <Accordion title="Mail Not Sending">
+    - Verify SMTP credentials are correct
+    - Check firewall allows outbound connections on mail port
+    - Test with a simpler configuration first
+    - Check logs in `storage/logs/laravel.log`
+    - Try using `MAIL_MAILER=log` to verify email generation works
+  </Accordion>
+
+  <Accordion title="Database Connection Failed">
+    - Verify database credentials
+    - Ensure database exists
+    - Check database user has proper permissions
+    - Verify database server is running and accessible
+    - Test connection using database client
+  </Accordion>
+
+  <Accordion title="APP_KEY Error">
+    Generate a new application key:
+    ```bash
+    php artisan key:generate
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="User Management" icon="users" href="/admin/user-management">
+    Learn how to manage users and roles
+  </Card>
+  <Card title="Features Guide" icon="star" href="/features/calendar">
+    Explore Health Manager's features
+  </Card>
+</CardGroup>

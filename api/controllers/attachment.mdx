@@ -1,0 +1,116 @@
+---
+title: AttachmentController
+description: Controller for serving private attachment files with authorization
+---
+
+## Overview
+
+The `AttachmentController` handles secure delivery of private attachment files, ensuring only authorized users can access their own files.
+
+**Namespace:** `App\Http\Controllers`
+
+**Class:** `AttachmentController`
+
+## Methods
+
+### show()
+
+Retrieves and serves a private attachment file to the authenticated user.
+
+**Route:** `GET /private-attachment/{attachment}`
+
+**Route Name:** `private_attachment.show`
+
+**Middleware:** `auth`, `verified`
+
+**Authentication:** Required
+
+#### Description
+
+This method serves attachment files stored in local storage. It performs authorization checks to ensure:
+1. The requesting user owns the attachment
+2. The file exists in storage
+
+If either check fails, an appropriate HTTP error is returned.
+
+#### Request Parameters
+
+| Parameter | Type | Location | Required | Description |
+|-----------|------|----------|----------|-------------|
+| attachment | Attachment | Route | Yes | Attachment model instance (route model binding) |
+
+#### Response
+
+**Success (200):** File content with appropriate MIME type
+
+**Forbidden (403):** User does not own the attachment
+- Message: "No tienes permiso para ver este archivo."
+
+**Not Found (404):** File does not exist in storage
+- Message: "El archivo no se encuentra."
+
+#### Code Example
+
+```php
+public function show(Attachment $attachment)
+{
+    if ($attachment->user_id !== auth()->id()) {
+        abort(403, 'No tienes permiso para ver este archivo.');
+    }
+
+    if (!Storage::disk('local')->exists($attachment->file_path)) {
+        abort(404, 'El archivo no se encuentra.');
+    }
+
+    return response()->file(Storage::disk('local')->path($attachment->file_path));
+}
+```
+
+#### HTTP Request Example
+
+```bash
+# Download a private attachment
+curl -X GET https://your-domain.com/private-attachment/123 \
+  -H "Cookie: your_session_cookie" \
+  --output downloaded-file.pdf
+```
+
+#### Usage in Blade
+
+```php
+@foreach($attachments as $attachment)
+    <a href="{{ route('private_attachment.show', $attachment) }}" target="_blank">
+        {{ $attachment->original_name }}
+    </a>
+@endforeach
+```
+
+#### Error Responses
+
+```bash
+# 403 Forbidden - Not the owner
+HTTP/1.1 403 Forbidden
+Content-Type: text/html
+
+No tienes permiso para ver este archivo.
+```
+
+```bash
+# 404 Not Found - File missing
+HTTP/1.1 404 Not Found
+Content-Type: text/html
+
+El archivo no se encuentra.
+```
+
+## Security
+
+- Route model binding automatically validates attachment ID
+- Ownership verification prevents unauthorized access
+- File existence check prevents path traversal attempts
+- Uses Laravel's local storage disk for secure file handling
+
+## Dependencies
+
+- `App\Models\Attachment`
+- `Illuminate\Support\Facades\Storage`
